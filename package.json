@@ -1,0 +1,35 @@
+{
+  "name": "mls-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build"
+  },
+  "devDependencies": {
+    "react-scripts": "5.0.1"
+  },
+  "browserslist": {
+    "production": [">0.2%", "not dead"],
+    "development": ["last 1 chrome version"]
+  }
+}
+```
+
+Click **Commit new file**.
+
+**File 2 — `src/App.jsx`**
+
+Wait — actually the structure needs to be slightly different. Vercel expects a standard Create React App layout. Let me give you the exact folder structure you need:
+```
+mls-tracker/
+├── package.json
+├── public/
+│   └── index.html
+└── src/
+    ├── index.js
+    └── App.jsx
