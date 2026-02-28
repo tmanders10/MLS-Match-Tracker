@@ -1,3 +1,46 @@
+import { useState, useMemo, useEffect } from "react";
+
+// MLS-aligned typography: Barlow Condensed (headlines/display) + Barlow (body/data)
+// mirrors MLS Tifo neo-grotesque family used on mlssoccer.com
+const fontLink = document.createElement("link");
+fontLink.rel = "stylesheet";
+fontLink.href = "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap";
+document.head.appendChild(fontLink);
+
+// Mobile-responsive styles
+const mobileStyle = document.createElement("style");
+mobileStyle.textContent = `
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #0f0f1a; }
+  #root { background: #0f0f1a; }
+  @media (max-width: 640px) {
+    .mls-nav { flex-wrap: wrap; height: auto !important; padding: 6px 12px !important; gap: 6px !important; }
+    .mls-nav-left { gap: 6px !important; }
+    .mls-nav-buttons { gap: 3px !important; }
+    .mls-nav-buttons button { padding: 4px 8px !important; font-size: 10px !important; letter-spacing: 0 !important; }
+    .mls-nav-buttons button span.icon-label { display: none; }
+    .mls-league-header { padding: 0 12px !important; }
+    .mls-league-header-inner { flex-direction: column !important; align-items: flex-start !important; padding: 10px 0 8px !important; gap: 8px !important; }
+    .mls-league-toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+    .mls-league-toolbar select { font-size: 11px !important; padding: 5px 8px !important; }
+    .mls-league-toolbar button, .mls-league-toolbar label { font-size: 10px !important; padding: 5px 8px !important; }
+    .mls-content { padding: 12px !important; }
+    .mls-card-grid { grid-template-columns: 1fr !important; }
+    .mls-standings-grid { grid-template-columns: 1fr !important; }
+    .mls-standings-row { grid-template-columns: 24px 1fr 36px 36px 36px 36px 44px 44px 44px 52px !important; font-size: 11px !important; padding: 0 8px !important; }
+    .mls-standings-header { grid-template-columns: 24px 1fr 36px 36px 36px 36px 44px 44px 44px 52px !important; font-size: 10px !important; padding: 8px 8px !important; }
+    .mls-h2h-row { grid-template-columns: 1fr 44px 44px 44px 44px 60px 60px 60px 60px !important; font-size: 11px !important; }
+    .mls-seasons-row { grid-template-columns: 48px 52px 44px 44px 44px 44px 60px 60px 60px 60px 1fr !important; font-size: 11px !important; }
+    .mls-team-header { padding: 10px 12px !important; }
+    .mls-team-header-top { flex-wrap: wrap !important; gap: 8px !important; }
+    .mls-tabs { overflow-x: auto; }
+    .mls-match-card { padding: 10px !important; }
+    .mls-score-modal { width: 92vw !important; padding: 20px !important; }
+    .mls-data-dialog { width: 96vw !important; padding: 16px !important; }
+  }
+`;
+document.head.appendChild(mobileStyle);
+
 const HISTORICAL_DATA = [
 ["1996-04-06","San Jose Earthquakes","DC United",1,0,"Regular",1],
 ["1996-04-13","LA Galaxy","New York Red Bulls",2,1,"Regular",1],
@@ -9577,3 +9620,1973 @@ const HISTORICAL_DATA = [
 ["2026-11-07","San Diego FC","Sporting Kansas City",-1,-1,"Regular",31],
 ["2026-11-07","Seattle Sounders","Los Angeles FC",-1,-1,"Regular",31]
 ];
+
+const ALL_TEAMS = [
+  "Atlanta United","Austin FC","CD Chivas USA","CF Montreal","Charlotte FC",
+  "Chicago Fire","Colorado Rapids","Columbus Crew","DC United","FC Cincinnati",
+  "FC Dallas","Houston Dynamo","Inter Miami","LA Galaxy","Los Angeles FC",
+  "Miami Fusion","Minnesota United","Nashville SC","New England Revolution",
+  "New York City FC","New York Red Bulls","Orlando City","Philadelphia Union",
+  "Portland Timbers","Real Salt Lake","San Diego FC","San Jose Earthquakes",
+  "Seattle Sounders","Sporting Kansas City","St Louis City SC","Tampa Bay Mutiny",
+  "Toronto FC","Vancouver Whitecaps"
+];
+
+const MLS_LOGO = "data:image/webp;base64,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";
+
+const TEAM_ABBR = {
+  "Atlanta United":          "ATL",
+  "Austin FC":               "ATX",
+  "CD Chivas USA":           "CHV",
+  "CF Montreal":             "MTL",
+  "Charlotte FC":            "CLT",
+  "Chicago Fire":            "CHI",
+  "Colorado Rapids":         "COL",
+  "Columbus Crew":           "CLB",
+  "DC United":               "DC",
+  "FC Cincinnati":           "CIN",
+  "FC Dallas":               "DAL",
+  "Houston Dynamo":          "HOU",
+  "Inter Miami":             "MIA",
+  "Inter Miami CF":          "MIA",
+  "LA Galaxy":               "LA",
+  "Los Angeles FC":          "LAFC",
+  "Miami Fusion":            "MIA",
+  "Minnesota United":        "MIN",
+  "Nashville SC":            "NSH",
+  "New England Revolution":  "NE",
+  "New York City FC":        "NYC",
+  "New York Red Bulls":      "NYRB",
+  "Orlando City":            "ORL",
+  "Philadelphia Union":      "PHI",
+  "Portland Timbers":        "POR",
+  "Real Salt Lake":          "RSL",
+  "San Diego FC":            "SD",
+  "San Jose Earthquakes":    "SJ",
+  "Seattle Sounders":        "SEA",
+  "Sporting Kansas City":    "SKC",
+  "Sporting KC":             "SKC",
+  "St Louis City SC":        "STL",
+  "St. Louis City SC":       "STL",
+  "Tampa Bay Mutiny":        "TB",
+  "Toronto FC":              "TOR",
+  "Vancouver Whitecaps":     "VAN",
+};
+
+const MATCH_TYPES = ["Regular","Conf Qtr","Conf Semi","Conf Final","Conf Playin","Play In","MLS Cup"];
+
+function getResult(match, team) {
+  if (match[3] < 0) return null; // unplayed
+  const isHome = match[1] === team;
+  const isAway = match[2] === team;
+  if (!isHome && !isAway) return null;
+  const hg = match[3], ag = match[4];
+  if (hg !== ag) {
+    if (isHome) return hg > ag ? "W" : "L";
+    else return ag > hg ? "W" : "L";
+  }
+  // Drawn match — check for penalty winner
+  const key = `${match[0]}|${match[1]}|${match[2]}`;
+  const pd = PENALTY_DATA[key];
+  if (pd) {
+    let winner = pd.w || (pd.h > pd.a ? match[1] : match[2]);
+    return winner === team ? "W" : "L";
+  }
+  return "D";
+}
+
+function calcRecord(matches, team) {
+  let w=0,l=0,d=0,gf=0,ga=0;
+  matches.forEach(m => {
+    if (m[3] < 0) return; // skip unplayed fixtures
+    const isHome = m[1] === team;
+    const isAway = m[2] === team;
+    if (!isHome && !isAway) return;
+    const hg = m[3], ag = m[4];
+    const myGoals = isHome ? hg : ag;
+    const theirGoals = isHome ? ag : hg;
+    gf += myGoals; ga += theirGoals;
+    if (myGoals > theirGoals) { w++; }
+    else if (myGoals < theirGoals) { l++; }
+    else {
+      // Check penalty winner for drawn non-regular matches
+      const pd = m[5] !== "Regular" ? PENALTY_DATA[`${m[0]}|${m[1]}|${m[2]}`] : null;
+      if (pd) {
+        const winner = pd.w || (pd.h > pd.a ? m[1] : m[2]);
+        if (winner === team) w++; else l++;
+      } else { d++; }
+    }
+  });
+  return {w,l,d,gf,ga,gd:gf-ga,pts:w*3+d};
+}
+
+const TEAM_COLORS = {
+  "Atlanta United": "#80000A",
+  "Austin FC": "#00B140",
+  "CD Chivas USA": "#C41E3A",
+  "CF Montreal": "#003DA5",
+  "Charlotte FC": "#1A85C8",
+  "Chicago Fire": "#CC0000",
+  "Colorado Rapids": "#960A2C",
+  "Columbus Crew": "#FFF200",
+  "DC United": "#231F20",
+  "FC Cincinnati": "#003087",
+  "FC Dallas": "#BF0D3E",
+  "Houston Dynamo": "#F36A20",
+  "Inter Miami": "#F7B5CD",
+  "LA Galaxy": "#00245D",
+  "Los Angeles FC": "#C39E6D",
+  "Miami Fusion": "#006DB6",
+  "Minnesota United": "#231F20",
+  "Nashville SC": "#ECE83A",
+  "New England Revolution": "#0A2240",
+  "New York City FC": "#6CACE4",
+  "New York Red Bulls": "#ED1E36",
+  "Orlando City": "#633492",
+  "Philadelphia Union": "#071B2C",
+  "Portland Timbers": "#004812",
+  "Real Salt Lake": "#B30838",
+  "San Diego FC": "#01AEF0",
+  "San Jose Earthquakes": "#0D4C92",
+  "Seattle Sounders": "#5D9732",
+  "Sporting Kansas City": "#91B0D5",
+  "St Louis City SC": "#C8102E",
+  "Tampa Bay Mutiny": "#003087",
+  "Toronto FC": "#B81137",
+  "Vancouver Whitecaps": "#00245E",
+};
+
+const TEAM_COLORS2 = {
+  "Atlanta United":          "#A19060",
+  "Austin FC":               "#00B140",
+  "CD Chivas USA":           "#FF0000",
+  "CF Montreal":             "#00B2E3",
+  "Charlotte FC":            "#1A85C8",
+  "Chicago Fire":            "#FFFFFF",
+  "Colorado Rapids":         "#960A2C",
+  "Columbus Crew":           "#FFF200",
+  "DC United":               "#FFFFFF",
+  "FC Cincinnati":           "#003087",
+  "FC Dallas":               "#BF0D3E",
+  "Houston Dynamo":          "#F4911E",
+  "Inter Miami":             "#F7B5CD",
+  "Inter Miami CF":          "#F7B5CD",
+  "LA Galaxy":               "#FFD700",
+  "Los Angeles FC":          "#C39E6D",
+  "Miami Fusion":            "#F7941D",
+  "Minnesota United":        "#231F20",
+  "Nashville SC":            "#ECE83A",
+  "New England Revolution":  "#FFFFFF",
+  "New York City FC":        "#F15524",
+  "New York Red Bulls":      "#ED2939",
+  "Orlando City":            "#612B8D",
+  "Philadelphia Union":      "#002D62",
+  "Portland Timbers":        "#004812",
+  "Real Salt Lake":          "#B30838",
+  "San Diego FC":            "#FF6B00",
+  "San Jose Earthquakes":    "#0067B1",
+  "Seattle Sounders":        "#5D9732",
+  "Sporting Kansas City":    "#91B0D5",
+  "Sporting KC":             "#91B0D5",
+  "St Louis City SC":        "#E31837",
+  "St. Louis City SC":       "#E31837",
+  "Tampa Bay Mutiny":        "#D4A017",
+  "Toronto FC":              "#E31937",
+  "Vancouver Whitecaps":     "#FFFFFF",
+};
+
+// Penalty shootout data: key = "date|home|away"
+// {h, a} = home/away pen goals; {w} = winner name only (score unknown)
+const PENALTY_DATA = {
+  "2004-11-06|DC United|New England Revolution":{h:4,a:3},
+  "2006-11-12|Houston Dynamo|New England Revolution":{h:4,a:3},
+  "2009-11-14|Chicago Fire|Real Salt Lake":{h:4,a:5},
+  "2009-11-14|LA Galaxy|Houston Dynamo":{w:"LA Galaxy"},
+  "2009-11-22|LA Galaxy|Real Salt Lake":{h:4,a:5},
+  "2012-11-18|DC United|Houston Dynamo":{h:2,a:3},
+  "2013-11-09|Houston Dynamo|Sporting Kansas City":{w:"Sporting Kansas City"},
+  "2013-12-07|Sporting Kansas City|Real Salt Lake":{h:7,a:6},
+  "2014-11-10|Seattle Sounders|FC Dallas":{w:"Seattle Sounders"},
+  "2015-10-29|Portland Timbers|Sporting Kansas City":{h:7,a:6},
+  "2015-11-08|FC Dallas|Seattle Sounders":{h:4,a:2},
+  "2016-12-10|Toronto FC|Seattle Sounders":{h:4,a:5},
+  "2017-10-26|Atlanta United|Columbus Crew":{h:1,a:3},
+  "2017-10-26|Houston Dynamo|Sporting Kansas City":{w:"Houston Dynamo"},
+  "2017-10-29|Vancouver Whitecaps|Seattle Sounders":{w:"Seattle Sounders"},
+  "2017-10-30|Houston Dynamo|Portland Timbers":{w:"Portland Timbers"},
+  "2017-11-21|Columbus Crew|Toronto FC":{w:"Toronto FC"},
+  "2018-11-01|DC United|Columbus Crew":{h:2,a:3},
+  "2018-11-04|Real Salt Lake|Sporting Kansas City":{w:"Sporting Kansas City"},
+  "2018-11-25|Portland Timbers|Sporting Kansas City":{w:"Portland Timbers"},
+  "2020-11-21|Orlando City|New York City FC":{h:6,a:5},
+  "2020-11-22|Portland Timbers|FC Dallas":{h:7,a:8},
+  "2020-11-22|Sporting Kansas City|San Jose Earthquakes":{h:3,a:0},
+  "2021-11-23|Seattle Sounders|Real Salt Lake":{h:5,a:6},
+  "2021-11-28|Philadelphia Union|Nashville SC":{h:2,a:0},
+  "2021-11-30|New England Revolution|New York City FC":{h:3,a:5},
+  "2021-12-11|Portland Timbers|New York City FC":{h:2,a:4},
+  "2022-10-16|Austin FC|Real Salt Lake":{h:3,a:1},
+  "2022-10-17|FC Dallas|Minnesota United":{h:5,a:4},
+  "2022-11-05|Los Angeles FC|Philadelphia Union":{h:3,a:0},
+  "2023-10-25|Sporting Kansas City|San Jose Earthquakes":{w:"Sporting Kansas City"},
+  "2023-11-04|New York Red Bulls|FC Cincinnati":{h:7,a:8},
+  "2023-11-06|Real Salt Lake|Houston Dynamo":{w:"Real Salt Lake"},
+  "2023-11-11|Houston Dynamo|Real Salt Lake":{h:4,a:3},
+  "2024-10-22|CF Montreal|Atlanta United":{h:4,a:5},
+  "2024-10-28|Seattle Sounders|Houston Dynamo":{h:5,a:4},
+  "2024-10-29|Real Salt Lake|Minnesota United":{h:4,a:5},
+  "2024-11-01|Charlotte FC|Orlando City":{h:3,a:1},
+  "2024-11-02|Minnesota United|Real Salt Lake":{h:3,a:1},
+  "2024-11-03|Houston Dynamo|Seattle Sounders":{w:"Seattle Sounders"},
+  "2024-11-03|New York Red Bulls|Columbus Crew":{h:5,a:4},
+  "2024-11-09|FC Cincinnati|New York City FC":{h:5,a:6},
+  "2024-11-09|Orlando City|Charlotte FC":{h:4,a:1},
+  "2025-10-26|Philadelphia Union|Chicago Fire":{h:4,a:2},
+  "2025-10-28|Minnesota United|Seattle Sounders":{h:3,a:2},
+  "2025-11-01|New York City FC|Charlotte FC":{h:6,a:7},
+  "2025-11-02|FC Dallas|Vancouver Whitecaps":{h:2,a:4},
+  "2025-11-02|Portland Timbers|San Diego FC":{h:3,a:2},
+  "2025-11-08|Minnesota United|Seattle Sounders":{h:7,a:6},
+  "2025-11-23|Vancouver Whitecaps|Los Angeles FC":{h:4,a:3}
+};
+
+// MLS Conference assignments (Eastern / Western)
+const TEAM_CONFERENCES = {
+  // Eastern Conference
+  "Atlanta United":          "Eastern",
+  "CF Montreal":             "Eastern",
+  "Charlotte FC":            "Eastern",
+  "Chicago Fire":            "Eastern",
+  "Columbus Crew":           "Eastern",
+  "DC United":               "Eastern",
+  "FC Cincinnati":           "Eastern",
+  "Inter Miami":             "Eastern",
+  "Nashville SC":            "Eastern",
+  "New England Revolution":  "Eastern",
+  "New York City FC":        "Eastern",
+  "New York Red Bulls":      "Eastern",
+  "Orlando City":            "Eastern",
+  "Philadelphia Union":      "Eastern",
+  "Toronto FC":              "Eastern",
+  // Western Conference
+  "Austin FC":               "Western",
+  "Colorado Rapids":         "Western",
+  "FC Dallas":               "Western",
+  "Houston Dynamo":          "Western",
+  "LA Galaxy":               "Western",
+  "Los Angeles FC":          "Western",
+  "Minnesota United":        "Western",
+  "Portland Timbers":        "Western",
+  "Real Salt Lake":          "Western",
+  "San Diego FC":            "Western",
+  "San Jose Earthquakes":    "Western",
+  "Seattle Sounders":        "Western",
+  "Sporting Kansas City":    "Western",
+  "St Louis City SC":        "Western",
+  "Vancouver Whitecaps":     "Western",
+  // Historical teams
+  "CD Chivas USA":           "Western",
+  "Miami Fusion":            "Eastern",
+  "Tampa Bay Mutiny":        "Eastern",
+};
+
+// MLS Cup Champions by season ID
+const MLS_CUP_WINNERS = {
+  5:"Sporting Kansas City", 6:"San Jose Earthquakes", 7:"LA Galaxy",
+  8:"San Jose Earthquakes", 9:"DC United", 10:"LA Galaxy",
+  11:"New England Revolution", 12:"Houston Dynamo", 13:"Columbus Crew",
+  14:"Real Salt Lake", 15:"FC Dallas", 16:"LA Galaxy", 17:"LA Galaxy",
+  18:"Real Salt Lake", 19:"New England Revolution", 20:"Portland Timbers",
+  21:"Seattle Sounders", 22:"Toronto FC", 23:"Atlanta United",
+  24:"Seattle Sounders", 25:"Columbus Crew", 26:"New York City FC",
+  27:"Los Angeles FC", 28:"Columbus Crew", 29:"LA Galaxy", 30:"Inter Miami",
+};
+
+// Supporters Shield Winners by season ID
+const SUPPORTERS_SHIELD_WINNERS = {
+  1:"Tampa Bay Mutiny", 2:"DC United", 3:"LA Galaxy", 4:"DC United",
+  5:"Chicago Fire", 6:"Miami Fusion", 7:"LA Galaxy", 8:"Chicago Fire",
+  9:"Sporting Kansas City", 10:"San Jose Earthquakes", 11:"DC United",
+  12:"DC United", 13:"Columbus Crew", 14:"Columbus Crew", 15:"LA Galaxy",
+  16:"LA Galaxy", 17:"San Jose Earthquakes", 18:"New York Red Bulls",
+  19:"Seattle Sounders", 20:"New York Red Bulls", 21:"FC Dallas",
+  22:"Toronto FC", 23:"New York Red Bulls", 24:"Los Angeles FC",
+  25:"Philadelphia Union", 26:"New England Revolution", 27:"Los Angeles FC",
+  28:"FC Cincinnati", 29:"Inter Miami", 30:"Philadelphia Union",
+};
+
+
+
+// Locally embedded MLS team badges (base64 PNG)
+const TEAM_LOGOS = {
+  "Atlanta United": "data:image/webp;base64,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",
+  "Austin FC": "data:image/webp;base64,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",
+  "CF Montreal": "data:image/webp;base64,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",
+  "Charlotte FC": "data:image/webp;base64,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",
+  "Chicago Fire": "data:image/webp;base64,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",
+  "Colorado Rapids": "data:image/webp;base64,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",
+  "Columbus Crew": "data:image/webp;base64,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",
+  "DC United": "data:image/webp;base64,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",
+  "FC Cincinnati": "data:image/webp;base64,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",
+  "FC Dallas": "data:image/webp;base64,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",
+  "Houston Dynamo": "data:image/webp;base64,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",
+  "Inter Miami": "data:image/webp;base64,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",
+  "Inter Miami CF": "data:image/webp;base64,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",
+  "LA Galaxy": "data:image/webp;base64,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",
+  "Los Angeles FC": "data:image/webp;base64,UklGRnYEAABXRUJQVlA4WAoAAAAQAAAAIgAALwAAQUxQSNgAAAABgJtte6rlTXJw2MAZQAeAIax3Oloql5qL2gZwneDvcXf/tcQ5yffiEGqKiJiAjVg05jca20jRfyoqTvw6icYo9CuM/WcQ/wuXfyC6QudtZ1KsJyvLHfTGzoI7K17EPhSjjy/Og3vmEIweJW3o5BfEhZac0AYKjUck6cLQyhdiw9CR5Hk7lAI0smvHNu/50QpJsfx4vznRkAeNjwYA8qtbhiN3pKMj7yMjbTX5AGDwuTIBPi3qumXIh55ifGqMwre1CQINlO3zqApQQWA0flenoXCuFGka3wdWUDggeAMAAHASAJ0BKiMAMAA+USSMRKOiIRVdVgA4BQSyAF8EoKq6n64EGg23PO6ehPyAOsz9ADpaPJ2uXPgT4F/Ux9J+H/I7kB9M2fZyZ+Qp9A/wmjPcdB4B5w/8B6iuc/57/2HuCfyr+m/6383/7hyJf61nqsW9A9rXz8mV7TM87M44P3LK1nHAZF1HabjP2BdFu6hjVvqet4nL0UH/hUZH4AD++ftNcv3+GFi1NXMcrU7WLkRZUkHEn+2IVmNpTbgO8N1SjFB4v5BzzIwStkKTycsbkoG6v9pMfAy8OCj/5NvF1h/+iZkUi/1nYT7R1W5iT8xZQPYmGX97bnBWbGwc/TG8yNMc5OyrMYuoAg3QQnPo+PmWRJJxBgLcC8OPZEFqx2pEkWlNwJB1HyQP7eWdG4W/EqQXwfgN9s+NmoJUFct/vs4//wyDebtNGik41NfAz5PN+HDddoBYtVDNnYitJ7H6+g6UP5rV6HJFoBhOxP/y2Utsof/Zyno/OCO6neZxEBGlFGNNFKB6DgEpmH4bRPFV4/XPbEUHX8XZuN7vMq1nMdekQ40Qkd2kCnTFqK8kSM2hScKCfNx2/jp/w8qGohiFTcmFZmTaXl5gzktU3y07iEjvnjK7iV5xZdY37lezR6WKUbvJtJ1Ifyyh6H4n05yIavnS9YHwVXS6Elqf/Ln+LPsVDvhhwh+QOFkfBh6zP1/7AQUR3mycCJHMFP0T2AodcuO0+wqcsPEkHhezZM0l80q0CtEYc2Dd5d5YARYiFLIarTHUHR1eQWBD6JqogwvsBTurWRliU87rHIRT5KEv2offL9nAxYPKd7qkN2eiv0rzM/aeen+nA1oCL6kkkl6l52oDVs6jC7N2TUjF5AMDiJIn+44uz2YJvxhtTkFTt7iCWXxyJInZdDJ+pZcq5cEPFu8jdQa0jHnNDCDK7QYlLGUeIkZzYfAY+puLpr6crDX4+t797C0p7sFdFC4ihJlr4XmBgUmry9OeU0vGMk48/ahQm/5HCP7f+HQCv3lL0GaYnnhJS5wizeHA6OpVVMvvMHwHyvPYeg3pXrsqdBeMAL0pr9xBuOSSj2lZ4RjiJU075jFxOJCV0+PSYLu3cr2g6f/il1NRF4vAcb5LegeI1Q/Cm/2dR/23tRYnj9+B6H3PEZvko/Nv/DuR/zHN1OWL/Mdvi9G3+QAAAA==",
+  "Minnesota United": "data:image/webp;base64,UklGRmQFAABXRUJQVlA4WAoAAAAQAAAAHgAALwAAQUxQSK8BAAABoEPb1rG92ud5YtupnMq2bXeq/jY2attOStu2bdt28j7v2cGrL7i3jYgJQGRBts0tYJG4IPMrlwabhARlvU+2QnoJERsSKMhwW/VGFgRLOgSnS585nfwiV+ixQqPcIjAWyN3jl3SoMRQQCMxVftPmR9YhvQWKjHz4GTCoPWPD3bFpxgQx7TI7A2UmvyTvA7CYS97NIRLgOOm9f6nO0s/kN30MiCm00/mPGooJ0G9rqSTpqfIXlG82+mD1VkYE9ir55TaV6pQM+LVEGwCwFpfpM2KIWMAYY4EC99SnxgJErAVKjH1KZdQI1gAV5n1g3CCxAOotd6SnCUg6QNrvIOmUcZWPBcjU6zipThlf+RjZ+l4hfcdElY8LnSadz4SVj+fyq8/ElY+v+MqUXOX/tSupup2qJ6l6/B/uUYoePXMuBc69PED6LiHfkaez9TxBqkvA+eTZPjkA02kXSaeR1JHc3yUdIBZAo1VKehqiHsl1TQBYAWAFqLroE+kpSfXIL8uqAWIFwdYApSe9In31yTfTygHGIrKxQJERt0neGVMcsAaxTTog98CTQ/IA6QzCAQBWUDggjgMAADAQAJ0BKh8AMAA+UR6MRCOhoRgNVVQ4BQSgDE6yAb3/kmc+j5MfC3rRxVOROsBw0+8LJB/hN4IyH/ndI5/yX5d8y14B6i382/y33VfGn/r+U35o/6XuD/yD+i/6f81uMz/YBodmC6NBvUhGdDol8ZNELmAKGKN/xH4QuUgesFZp0of5Zwm3JgkDQAD+/6Kl3PDpwKWH/oHsX6Y4rdXHacdjXiO+LFkz85b7dUa9auyG85s/jRa4lyY+evYCY/+Gvkm/8bXP/zaWn+LoODkY5lbmmwUP08RTEVHBN/kYd9uD9aLS2kF9A8SWr/CXgC1FXPVwg0V8xleMqGkqxwSk8VL7jzPfVSTvo9VepdLTYovohX/Oq03As/ZDMrE+bOE//1/BmroCqkK7FZ/f//4zPA7vBB4UVj9XvwJGFhPj11plf13fgn4M8g+DRv/R89YoWMGSvuv0HDd7KPw00iZLKPp/IUDI5Gi9Op/UjNdvbbqArMJZqENQMXwKl9ROb4TsIOgRqZUm7TfcCnv7krfZDM8RT2IELoY+lYiHR9TjVP/qvrHrnoI+dOut6098d1iM16p0lckSG42YUGLohpJmfMsdYxqA3AnTK3Nm12n5TwPrn+Gzi0QsS5piSRltV3pgb6+MfHGYG/5Ygui+bDIWxWe6mFhcecX9/0f1RuWq//lwu5Y2OGrQNCeMI7/j7qabm5PAgB/bGU0G2F87Bc2rJ/+0uGLfF8EPmHT3Nmn27+sQ97St9dSp0Ocf9+JoXncDoXgWK/8a35PYU8M2rRjQZ5vSiyYK9tj1sNfX3kTgsCNpuoU2zdxNtiIoEt+kGroCW95E3Gye1PKc4KQacd2t395DLn5duk5tKvekbHBQZA4s/SEw5PoaBM7LdAzJYD0Bagu1ThYdAmnsk27hjyzeoSUVtb79wqYnGDblgGUDNckGzTLUF/1e8W/+hvAsyKSC5uLiMyh1p8RRS3EJRwBcYbTgwIN3ATgPl3T5m5oEA/y10oIiwS+fLB1OSKAoQr72sNr0cKxd/aBtDnqDXP0G1NzTF8TeIW4vCjl3HqMKtBT2VHG3yDPyUx1wDfalavrGb7BDAIq7+2KWJfL/aB5OdoZx6bFNrf6cTOkf5sLrQsU4RZKieF9aF/bfjMv6r4H53++mlU7PPkr/OZ7Yr4NDskL3A+zPE/Uo2ffkeO+EzNyb30fh1T1n47eeiD2gAAA=",
+  "Nashville SC": "data:image/webp;base64,UklGRgQFAABXRUJQVlA4WAoAAAAQAAAAIQAALwAAQUxQSLQAAAABcFtr25O8hMMGVDoDtW6hrQzCCIzBInTMwABaETpz+P//JYevtYkIA2nbtL+FzgOGuvDTqqxHllXqw8W0LoKcM+bB9FkODlcqM6ni9QjHGmFbiEjFGRUZwbIHOPASasNZjWbiwQHgYpPxx0X+mG3hwsX+0v/SO+/g4vSi4mIV3yFiUnOFmozfZtWT2rwLmnUYFvV66n8UEjWQKIpElVaX7RWK1FGgsAKVFii9wFpILY7AagFWUDggKgQAAHAWAJ0BKiIAMAA+SRyLRCKhoRjlACgEhLYAVJPOYWfR/kz5QF/47RbV/wH4AfJHbAeYD9ef2Z96r+wdK7/JfV0/1XsZ+gB+kvpHfsd8Jv7Tei7/8rqb4E+E/yx7RZBH8kOTWU71g8Tv53/quMDvGcOj4R6jn9e/xXpoZz/yv/Df7j3Cv5f/Q/95/buFJ/VUaySyodz9xmMPY9nat7ZPF0MDNodzCnQjBUKSPBYX+OI8e8zP4Wev7NAbXfo4AP73UztHZSWtd2sSVw3fKKldEv7QkP/pPxIkym0TnUb07cdHNyxdwLBxf7/VfSsYwm7zn6u//LKoPNPuQ9h9TVYmOJCL80wUNe/EcmV+d/wFyvUluh096LjfhLAjHUP8PMlJgei6v2Dv/qkPUR+NTLPIpX9bwin/Tv/XPamKzzojDHbkJPTAfbxBy10l9+QA3W9OBKlEatIYZlNFEc2o9HzyKQv9u9/8R9d7+Bn/fVdUxBtNrWGjH+5K+H8VwQmF349mbkXUD4q/j7MluJ8W6cKle9uVJOX/4aDQce/8qAOzH8XW8t9R6TlCTylUiysmloD3DfLjTX4Qjzq09DC3/Uv+dCzMzwpyhsKHv+oXEt/I50Ac4bv8gxwLrjlFPl608aI23k93t2/W5ZHeKm3hipksnapzH9nd7Xfv/nBbMPYPmobiPlo/X+42/4KDUxKMez+GH18yDUY78k8mEmACnfHyoDhiFvv/D6f9vWEsmMMQueNIR9mI18Hh5CzecbstwfXmXZWoHeXVsPP/8PKL3+hT4Ka+/ULJkVcpSsLjvqAzv4zLmPldDV/Wc/v6FTqLRu4IF7deYDQzoBr/R8oDf8fr3QsEFAFKj9hpymP1WDfIyLZpgWVchMZ8ldPFGl9YwTB3EckwqybxRE36lR2ntbSIETreFLd+Rzghl/naamxK/YrFsdQGMYtwMu1+0lOvGuAsleTwD0xRL18o8N1juLkQ3DG7r8kCbQEs2TStT/iidN3FLG3jzdb/4NehG85nsw0+eD+08oO3kB5aHlXKc94DaFi6uu1YmdUNr9Jl3DSC7aXXoVtZbM/AAkS6TJOpbqGhRGZK7+whn9vcdJuy5Gp8X96/s6l1yN6O9Un3e3Aq4JE/JvPPt+y8bm1O775uDCzOMSQyd7a2PJBDVn0xIK0PMY9xWS5zZsEe5f+xuaObD9YqfumMbz5w96+LHXvq6sJnIxErMrdbR4UL5qsnub3DcnCMxPenPzSVRo0xHZweMEv/2NuzDgQEToJ/vcPXnj4uOBHNbAdedKXC6IfDTerMB8OFu9hQMaikvbjyMjH6+RxsN4CHPj5dFcH3z5JNqfmoY4pC/t7+KehfbD9XryEODDIzCOkYIx3vVX8qxhh1UzW+c1rgv9c48ZBbNdtUkb91UYgOYrTMx6LAAAA=",
+  "New England Revolution": "data:image/webp;base64,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",
+  "New York City FC": "data:image/webp;base64,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",
+  "New York Red Bulls": "data:image/webp;base64,UklGRgYFAABXRUJQVlA4IPoEAABQGgCdASowACcAPkkciUQioaEarq1UKASEtgBOmY4/ikRWH+17SYa3q8/R9L3wY+oB5gP1j/VXsQegB+uXW8+gB5bHsY/s16On//ulfgv4gPUHr5k3vu/CD7Yv4DyQ/138octB+U/5/jA+Wb1Mfz7/GcejQA/Gv+L/MD5Qv3//d/4bzoflv9x/3H+A+AT+R/0f/L/2v97f8H4JPRV/XVJ93hp766eGeVegFY2/vxHDp8dpYRVq/h0Da/VkvF/jiVffynU2rl/JGTTN4NuemUn3jB4S+iQhX8986jAA/v93BNfllF/IkBW/7aQgvLPzNnmNDYc59ZlswS3Q+Zl8Ms+T3CuqjTx8wu+PGYw87nDBKrpN47AXdSMxKUpv+V6+L/Yw4/jfXn/ng/QlIs2WXg01Vi+ty6I3xQ4xOtYQ3rtVza94WInUT56MPsvZpVDBbdFk9zO5ZHuVw+YOJf34+kc4/L0iQ6KGtPfA43aDYQ49looVfPJ55dnh8rasv8PHoqJYhWZP9cC9uhL/w8d9Ng03oKKV3GQjQW4p5soX2EiA93kHx6zNTJX91mjRX0pjW9/8qTpu7V3ewj+dJEcrh85mE9/MCddGeDoDLrfww0d+pq/ulpcXUBu8sQOzajYf8B4A0Bt7zGH3Wi5fvO7fzZXVKdAPrzPBr0fN2WsovV+rik38sQpWANT87Xa4aL1/6aSd5+c0vc0FPhWm8AFEFd3mo9+/KZHMlhQhV5QPfTmJOl7SW3tddtXp0Mwl4JfaiW4cme1vHCH8frhzNgpUJXXcQHEjiQk1Wc51oXOFleVmLTuLZ85xswwhbWkCzBvwiDEpOW7fKNA+DAHFwYOEESBgDQ+IJfR5/O8HrniL94cSndrMuUXW1z1NY4Fi9NwePsRSR2RdY5soP2+gpKemrdn/ddiPB8wTuTpS58RCfAcY9i3PvhAxMJSwCH4vawC4aEyfOo9EavlFV3Zt+v4eVzrAbsIL+GJ4mIOtz5xCQNtymeV5lkNKaujUmKBhhx9Z8AYnYKjP25RNY9xdrrsDjKj/TIeTe1mNZend5nd1d0uWsiZf64xO8jKzjFKLfkf/wDiPtr/VucD/LqPOsaHR1mVEQN8bG7bUn8+P5vLWIW4+e6kAYxof/45fJKIhRdtX2jiDGJgb8HrNA205fv5ZMfRvzT7Vc4kdBUirNDREdJwiFbf1gklYmtdp8vzbW8oJ8+TG1DEIcXvbxhwDdPVTqVvmyyj8hxE+KEl9xufR41BfsEAWsUIv14V74cck55L01HttsgF3Tq+sBppR+VirIxFWtAvIpn/XtQdawEOwjlH16O2vxFGHs+Q+fes3gfIUKqIzJSYFFtf2K6K1x82rFqvLBjkFJXzU43Gj/1Akw/Xq/h2WgNI5HkiQYkoEE67tuTsebaq26jxVJzAZsfw1mRyoEt0uHvxmQYdCHN1qhWYmjBYJAPm3+IpPaffqRFdvGOUB5Q4Lk1aejjLTxFX6Ot9FePJd0EDOHf9DXi/qu//00fh3tzAX36gv4luf6LpT2t0n/meCAcxOO6n+IKOsl54QxmhLYfhvhctHRw3JQ47lDt6b7Gbh+W+9uHJogJWRtvx48OPl9TOCI58CxUNAzAsv4cxigcZnCBzuM8chjTDloer9yzeGteLdme93RK4oMdWKOduGPY/LDP+ofyuvLhPA29sOLdddQ6gAAA==",
+  "Orlando City": "data:image/webp;base64,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",
+  "Philadelphia Union": "data:image/webp;base64,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",
+  "Portland Timbers": "data:image/webp;base64,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",
+  "Real Salt Lake": "data:image/webp;base64,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",
+  "San Diego FC": "data:image/webp;base64,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",
+  "San Jose Earthquakes": "data:image/webp;base64,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",
+  "Seattle Sounders": "data:image/webp;base64,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",
+  "Sporting KC": "data:image/webp;base64,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",
+  "Sporting Kansas City": "data:image/webp;base64,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",
+  "St Louis City SC": "data:image/webp;base64,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",
+  "St. Louis City SC": "data:image/webp;base64,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",
+  "Toronto FC": "data:image/webp;base64,UklGRqwEAABXRUJQVlA4IKAEAACwGACdASowAC0APkkcikQioaEarVVUKASEtgBdnMbpnNHIt7q4AB0Kvqo5+D0RegB+wHWAegB+gHpb/sh8IX7UftV7VFsS9Wj5S9ldytvl/wH5I/kVqGv8Psgkhn8o/wX5of3T0Af0D0A+iPmUf6fjBpiP80/x39s/bf/M/EX/c+U35Z/2/uB/xv+df7H+9fvD8UfVFfto2yALEnE+S4TPgTaWTvge1D79GubT7Ao8drMVFKfjmQDzlfJgj4MG505rqbDJpWNDSI33YPxFgAD+//5iBv/1dbtwjQZkc6lgFj2kEe1N/xKpNGfkTcqHbaTkY/2d8ZR1+yujAy7fFMc71qIXv+hnv/b6t5BPOXNl1W1EDtO1b2KwnY0vBDFCMkVlM6Z5xFj0Vq65mNDY4h9zqv3KPJPqqY4ZugAc9ZNc7YDY+xDNqZwr+KoYWyLL9Quf8Fs57cKyT5pQce0oTulm4GYRV0k/5BvRgYvWKHV3YjbL3sdJVObfdTkGLsQ38VokuH4+QOkUobYMoyNHCX+XiWZi2Tf/Et/+vf8gzgft609J8GmhdmFZMXblYPTpvTD8lOgVoPycDZWfxpd7opxDkWpQgPj3RPDBo7/pMvfagug5lF7vBFKwno8ntP70el5aVxK8QUa1Dhf3qnTuUqsT/Aopn3L1S9lWd+XXHiQRGWoD1b/UNPq7pImWc2BYmUl59vfRWc0577vepuuwaTkguPxqgoSBtB9RLdoXi2kR1eiim4OfmIaawyH+v2erGhGik8blzGJtTBGGX8szH1kdJzyqDQh2ROXPvUiv2CJAvTFbn5w8KUS/UrOJXT7k+cVBuxz5XKY6wXJ+/OIHEpmZjzc3SOAKF5BL1bXPkwxlP/CJ+EyLDh4CBeqAZQ95aH1JIENGVKfzGDKiyQRLpl1Hs5YuKfQ7l/xV+CLrv/XKpSYttCOKb3UWIhIzAD/oZyKx/FubJ+KKEyf+HACKrUYp8Gc2tuJt3Lbn/9eI25JYI4+lHO3M5KIghGA2US8Kt0RMRxgdgimqTYPZhSK+AS8t3ezyp0LBEsHzBgnyrftheaHf/5nfVTt5vIIT9KEATptXa/0/b3pYVLwjpD13w/6XdcI5zHjWAX/pqJ2BxMhg+ZbYD+KpCRpuzKdjmxMShiPhYcSyjNDlKrL39vfyzWfg76+u/O6pljnpH0s/Rc2YWQZfDuYbMg2/kI2DN1AIDrHI+pb0+I9/5OaaZE91/OcWIXU7v6sMFSbVD0lf//GJ9KtuRM3MJNJrOgPKmoh3qzanfLqKOiw+F7/W8pOebTLP8/XoWYisURmSFE2TWcZP4LALeQVuZDcG96iNKFItZx2SBdQUmFXFGQ37WkN86QlGm+tnfZeFNyHsQniSQjbK2+aimlFs13v6NRqBWKbIfWbSQMyNEjk9jWEbyyzt3I5XuygFIeUJ9+BWCQ824LVGVvk/kmPUY2WJVfb9tUSNtnN0BcAz/p/LkFGGzuxfo7/uN6IskdBHApyQq9AcmO00HnX3p6TG3uv1a3BzVRxKrS049EJbqEgnNPBaiGCRg0uHnRTbQCJMKSAbedcXdHKgAA==",
+  "Vancouver Whitecaps": "data:image/webp;base64,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"
+};
+
+function TeamBadge({ team, size = 48 }) {
+  const logoUrl = TEAM_LOGOS[team];
+  const primary = TEAM_COLORS[team] || "#1a3a5c";
+  const secondary = TEAM_COLORS2[team] || "#ffffff";
+  const abbr = TEAM_ABBR[team] || (team || "").slice(0,3).toUpperCase();
+
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt={team}
+        width={size}
+        height={size}
+        style={{
+          width: size, height: size,
+          objectFit: "contain",
+          flexShrink: 0,
+          filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.5))"
+        }}
+        onError={e => { e.target.style.display = "none"; }}
+      />
+    );
+  }
+
+  // SVG shield fallback for teams without a badge
+  const fontSize = abbr.length <= 2 ? size * 0.30 : abbr.length === 3 ? size * 0.25 : size * 0.19;
+  const s = size, cx = s / 2;
+  const filterId = `sh_${abbr}_${s}`;
+  const shield = `M ${cx} ${s*0.06} L ${s*0.94} ${s*0.28} L ${s*0.94} ${s*0.62} Q ${s*0.94} ${s*0.82} ${cx} ${s*0.96} Q ${s*0.06} ${s*0.82} ${s*0.06} ${s*0.62} L ${s*0.06} ${s*0.28} Z`;
+  const accent = `M ${cx} ${s*0.06} L ${s*0.94} ${s*0.28} L ${s*0.94} ${s*0.62} Q ${s*0.94} ${s*0.78} ${s*0.6} ${s*0.90} Z`;
+  const isWhite = secondary === "#FFFFFF" || secondary === "#fff" || secondary === "#ffffff";
+  return (
+    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} style={{flexShrink:0}}>
+      <defs>
+        <filter id={filterId} x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#000" floodOpacity="0.55"/>
+        </filter>
+      </defs>
+      <path d={shield} fill={primary} filter={`url(#${filterId})`} />
+      <path d={accent} fill={isWhite ? "rgba(255,255,255,0.15)" : secondary} opacity="0.9" />
+      <path d={shield} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={Math.max(0.5, s*0.03)} />
+      <text x={cx} y={s*0.595} textAnchor="middle" dominantBaseline="middle"
+        fill={isWhite ? primary : "#fff"} fontSize={fontSize} fontWeight="900"
+        fontFamily="'Barlow Condensed', 'Arial Narrow', sans-serif"
+        letterSpacing={abbr.length >= 4 ? "-0.5" : "0.5"}
+      >{abbr}</text>
+    </svg>
+  );
+}
+
+
+export default function App() {
+  // Track window width for responsive layout
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isMobile = windowWidth < 640;
+
+  const [matches, setMatches] = useState(() => {
+    try {
+      const stored = localStorage.getItem ? null : null; // no localStorage
+      return [...HISTORICAL_DATA];
+    } catch { return [...HISTORICAL_DATA]; }
+  });
+
+  const [tab, setTab] = useState("dashboard");
+  const [selectedTeam, setSelectedTeam] = useState("Atlanta United");
+  const [vsTeam, setVsTeam] = useState("");
+  const [filterType, setFilterType] = useState("All");
+  const [filterSeason, setFilterSeason] = useState("All");
+  const [dashboardSeason, setDashboardSeason] = useState(null);
+  const [h2hSort, setH2hSort] = useState({col:"gp", dir:"desc"}); // null = auto (latest played season)
+  const [showAddMatch, setShowAddMatch] = useState(false);
+  const [newMatch, setNewMatch] = useState({
+    date: new Date().toISOString().slice(0,10),
+    home: "", away: "", homeGoals: "", awayGoals: "", matchType: "Regular", seasonId: 31
+  });
+  const [editingMatch, setEditingMatch] = useState(null); // original match array being edited
+  const [notification, setNotification] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showDataDialog, setShowDataDialog] = useState(false);
+  const [generatedData, setGeneratedData] = useState("");
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [view, setView] = useState("league"); // "team" | "league" | "standings"
+  const [standingsSeason, setStandingsSeason] = useState(31);
+  const [prevView, setPrevView] = useState("league"); // remembers last view when toggling
+  const [scoreEntry, setScoreEntry] = useState(null); // { matchIdx, match } | null
+  const [scoreInput, setScoreInput] = useState({ hg: "", ag: "" });
+  const [enteredScores, setEnteredScores] = useState({}); // key: "date|home|away" -> [hg,ag]
+  const [leagueSeason, setLeagueSeason] = useState(31);
+  const [matchdayIdx, setMatchdayIdx] = useState(0);
+
+  // Load added matches and entered scores from storage
+  useEffect(() => {
+    try {
+      const added = localStorage.getItem("mls_added_matches");
+      const locked = localStorage.getItem("mls_locked_scores");
+      const lockedMap = locked ? JSON.parse(locked) : {};
+      const base = added ? [...HISTORICAL_DATA, ...JSON.parse(added)] : [...HISTORICAL_DATA];
+      if (Object.keys(lockedMap).length > 0) {
+        setMatches(base.map(m => {
+          const s = lockedMap[`${m[0]}|${m[1]}|${m[2]}`];
+          return s ? [m[0], m[1], m[2], s[0], s[1], m[5], m[6]] : m;
+        }));
+      } else {
+        if (added) setMatches(base);
+      }
+    } catch(e) {}
+    try {
+      const scores = localStorage.getItem("mls_entered_scores");
+      if (scores) setEnteredScores(JSON.parse(scores));
+    } catch(e) {}
+  }, []);
+
+  // Merge entered scores into matches so team view sees league-entered results
+  const effectiveMatches = useMemo(() => {
+    if (Object.keys(enteredScores).length === 0) return matches;
+    return matches.map(m => {
+      const score = enteredScores[`${m[0]}|${m[1]}|${m[2]}`];
+      if (!score) return m;
+      // Return a new array with the real scores substituted in
+      return [m[0], m[1], m[2], score[0], score[1], m[5], m[6]];
+    });
+  }, [matches, enteredScores]);
+
+  const seasons = useMemo(() => {
+    const s = [...new Set(effectiveMatches.map(m => m[6]))].sort((a,b) => a-b);
+    return s;
+  }, [effectiveMatches]);
+
+  // Seasons that have at least one played match (for team dropdowns)
+  const playedSeasons = useMemo(() => {
+    const s = [...new Set(effectiveMatches.filter(m => m[3] >= 0).map(m => m[6]))].sort((a,b) => a-b);
+    return s;
+  }, [effectiveMatches]);
+
+  // Build matchweek groups for league view (Monday–Sunday calendar weeks)
+  const { matchdays, defaultMatchweekIdx } = useMemo(() => {
+    const seasonMatches = effectiveMatches.filter(m => m[6] === leagueSeason);
+    const byDate = {};
+    seasonMatches.forEach(m => {
+      if (!byDate[m[0]]) byDate[m[0]] = [];
+      byDate[m[0]].push(m);
+    });
+    // Get the Monday of a given date's week
+    const getWeekKey = (dateStr) => {
+      const d = new Date(dateStr + 'T12:00:00');
+      const day = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+      const diff = (day === 0) ? -6 : 1 - day; // shift so Monday=0
+      const monday = new Date(d);
+      monday.setDate(d.getDate() + diff);
+      return monday.toISOString().slice(0, 10);
+    };
+    // Group all dates by their Mon–Sun week
+    const weekMap = {};
+    Object.keys(byDate).sort().forEach(d => {
+      const key = getWeekKey(d);
+      if (!weekMap[key]) weekMap[key] = { weekStart: key, dates: [], matches: [] };
+      weekMap[key].dates.push(d);
+      weekMap[key].matches.push(...byDate[d]);
+    });
+    // Sort weeks chronologically and drop empty ones
+    const groups = Object.values(weekMap)
+      .filter(w => w.matches.length > 0)
+      .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+
+    // Find the current matchweek based on today's date
+    const today = new Date().toISOString().slice(0, 10);
+    let defaultIdx = 0;
+    for (let i = 0; i < groups.length; i++) {
+      const wkSun = new Date(groups[i].weekStart + 'T12:00:00');
+      wkSun.setDate(wkSun.getDate() + 6);
+      const wkSunStr = wkSun.toISOString().slice(0, 10);
+      if (today <= wkSunStr) { defaultIdx = i; break; }
+      defaultIdx = i; // if past all weeks, land on the last one
+    }
+
+    return { matchdays: groups, defaultMatchweekIdx: defaultIdx };
+  }, [effectiveMatches, leagueSeason]);
+
+  // Auto-jump: current matchweek for current season, matchweek 1 for historical seasons
+  useEffect(() => {
+    const maxSeason = seasons.length > 0 ? Math.max(...seasons) : leagueSeason;
+    setMatchdayIdx(leagueSeason === maxSeason ? defaultMatchweekIdx : 0);
+  }, [defaultMatchweekIdx, leagueSeason]);
+
+  // Compute standings for a given season
+  const computeStandings = (seasonId) => {
+    const seasonMatches = effectiveMatches.filter(m => m[6] === seasonId && m[3] >= 0 && m[5] === "Regular");
+    const table = {};
+    seasonMatches.forEach(m => {
+      const home = m[1], away = m[2], hg = m[3], ag = m[4];
+      if (!table[home]) table[home] = {team:home,gp:0,w:0,d:0,l:0,gf:0,ga:0,pts:0};
+      if (!table[away]) table[away] = {team:away,gp:0,w:0,d:0,l:0,gf:0,ga:0,pts:0};
+      table[home].gp++; table[away].gp++;
+      table[home].gf += hg; table[home].ga += ag;
+      table[away].gf += ag; table[away].ga += hg;
+      if (hg > ag) { table[home].w++; table[home].pts+=3; table[away].l++; }
+      else if (hg < ag) { table[away].w++; table[away].pts+=3; table[home].l++; }
+      else { table[home].d++; table[home].pts++; table[away].d++; table[away].pts++; }
+    });
+    return Object.values(table).sort((a,b) =>
+      b.pts-a.pts || b.w-a.w || b.gf-a.gf || a.ga-b.ga
+    );
+  };
+
+  const standingsData = useMemo(() => computeStandings(standingsSeason),
+    [effectiveMatches, standingsSeason]);
+
+  const eastStandings = useMemo(() =>
+    standingsData.filter(r => TEAM_CONFERENCES[r.team] === "Eastern"),
+    [standingsData]);
+
+  const westStandings = useMemo(() =>
+    standingsData.filter(r => TEAM_CONFERENCES[r.team] === "Western"),
+    [standingsData]);
+
+
+  const teamMatches = useMemo(() => {
+    return effectiveMatches.filter(m => m[3] >= 0 && (m[1] === selectedTeam || m[2] === selectedTeam));
+  }, [effectiveMatches, selectedTeam]);
+
+  const filteredMatches = useMemo(() => {
+    let f = teamMatches;
+    if (vsTeam) f = f.filter(m => m[1] === vsTeam || m[2] === vsTeam);
+    if (filterType !== "All") f = f.filter(m => m[5] === filterType);
+    if (filterSeason !== "All") f = f.filter(m => m[6] === parseInt(filterSeason));
+    return f.sort((a,b) => b[0].localeCompare(a[0]));
+  }, [teamMatches, vsTeam, filterType, filterSeason]);
+
+  const homeMatches = useMemo(() => teamMatches.filter(m => m[1] === selectedTeam), [teamMatches, selectedTeam]);
+  const awayMatches = useMemo(() => teamMatches.filter(m => m[2] === selectedTeam), [teamMatches, selectedTeam]);
+
+  const overallRecord = useMemo(() => calcRecord(filteredMatches, selectedTeam), [filteredMatches, selectedTeam]);
+  const homeRecord = useMemo(() => calcRecord(homeMatches, selectedTeam), [homeMatches, selectedTeam]);
+  const awayRecord = useMemo(() => calcRecord(awayMatches, selectedTeam), [awayMatches, selectedTeam]);
+
+  const seasonalData = useMemo(() => {
+    const byS = {};
+    teamMatches.forEach(m => {
+      const s = m[6];
+      if (!byS[s]) byS[s] = [];
+      byS[s].push(m);
+    });
+    return Object.entries(byS).map(([s, ms]) => ({
+      season: parseInt(s),
+      ...calcRecord(ms, selectedTeam),
+      gp: ms.length
+    })).sort((a,b) => b.season - a.season);
+  }, [teamMatches, selectedTeam]);
+
+  // Head to head
+  const h2hData = useMemo(() => {
+    const results = {};
+    teamMatches.forEach(m => {
+      const opp = m[1] === selectedTeam ? m[2] : m[1];
+      if (!results[opp]) results[opp] = [];
+      results[opp].push(m);
+    });
+    return Object.entries(results).map(([opp, ms]) => ({
+      opponent: opp,
+      ...calcRecord(ms, selectedTeam),
+      gp: ms.length
+    })).sort((a,b) => b.gp - a.gp);
+  }, [teamMatches, selectedTeam]);
+
+  // Dashboard season stats
+  const dashboardSeasonId = useMemo(() => {
+    // If manually selected use that, otherwise default to latest season with played matches
+    if (dashboardSeason !== null) return dashboardSeason;
+    const played = teamMatches.map(m => m[6]);
+    if (played.length === 0) return null;
+    return Math.max(...played);
+  }, [dashboardSeason, teamMatches]);
+
+  const seasonTeamMatches = useMemo(() => {
+    if (dashboardSeasonId === null) return [];
+    return teamMatches.filter(m => m[6] === dashboardSeasonId);
+  }, [teamMatches, dashboardSeasonId]);
+
+  // All matches for the selected season including unplayed fixtures (for schedule display)
+  const seasonAllMatches = useMemo(() => {
+    if (dashboardSeasonId === null) return [];
+    return effectiveMatches.filter(m => m[6] === dashboardSeasonId &&
+      (m[1] === selectedTeam || m[2] === selectedTeam));
+  }, [effectiveMatches, dashboardSeasonId, selectedTeam]);
+
+  const seasonHomeMatches = useMemo(() =>
+    seasonTeamMatches.filter(m => m[1] === selectedTeam),
+    [seasonTeamMatches, selectedTeam]);
+
+  const seasonAwayMatches = useMemo(() =>
+    seasonTeamMatches.filter(m => m[2] === selectedTeam),
+    [seasonTeamMatches, selectedTeam]);
+
+  const scoreKey = (m) => `${m[0]}|${m[1]}|${m[2]}`;
+
+  // Returns penalty data for a non-regular match that ended level
+  // {h, a} if score known; {w} if winner-only; null if no data
+  const getPenData = (m) => {
+    if (m[5] === "Regular" || m[3] !== m[4] || m[3] < 0) return null;
+    return PENALTY_DATA[scoreKey(m)] || null;
+  };
+  const penWinner = (m) => {
+    const pd = getPenData(m);
+    if (!pd) return null;
+    if (pd.w) return pd.w; // winner-only record
+    return pd.h > pd.a ? m[1] : m[2];
+  };
+
+  function saveScore() {
+    if (scoreInput.hg === "" || scoreInput.ag === "") return;
+    const m = scoreEntry.match;
+    const key = scoreKey(m);
+    const hg = parseInt(scoreInput.hg), ag = parseInt(scoreInput.ag);
+    const updated = { ...enteredScores, [key]: [hg, ag] };
+    setEnteredScores(updated);
+    try { localStorage.setItem("mls_entered_scores", JSON.stringify(updated)); } catch(e) {}
+    setScoreEntry(null);
+    setScoreInput({ hg: "", ag: "" });
+  }
+
+  function deleteScore(m) {
+    const key = scoreKey(m);
+    const updated = { ...enteredScores };
+    delete updated[key];
+    setEnteredScores(updated);
+    try { localStorage.setItem("mls_entered_scores", JSON.stringify(updated)); } catch(e) {}
+  }
+
+  const getScore = (m) => enteredScores[scoreKey(m)] || null;
+
+  function exportScores() {
+    const data = JSON.stringify(enteredScores, null, 2);
+    const blob = new Blob([data], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "mls_scores.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function submitAdminLogin() {
+    if (adminPassword === "fsfsicko") {
+      setIsAdmin(true);
+      setShowAdminLogin(false);
+      setAdminPassword("");
+      setNotification("Admin mode enabled.");
+      setTimeout(() => setNotification(""), 3000);
+    } else {
+      setAdminPassword("");
+      setNotification("Incorrect password.");
+      setTimeout(() => setNotification(""), 3000);
+    }
+  }
+
+  function generateHistoricalData() {
+    // Merge enteredScores + locked scores on top of current matches state
+    let lockedMap = {};
+    try {
+      const stored = localStorage.getItem("mls_locked_scores");
+      if (stored) lockedMap = JSON.parse(stored);
+    } catch(e) {}
+    const allScores = { ...lockedMap, ...enteredScores };
+
+    // Apply all scores to the current matches array
+    const patched = matches.map(m => {
+      const s = allScores[`${m[0]}|${m[1]}|${m[2]}`];
+      return s ? [m[0], m[1], m[2], s[0], s[1], m[5], m[6]] : m;
+    });
+
+    const rows = patched.map(m => JSON.stringify(m)).join(",\n");
+    const output = `const HISTORICAL_DATA = [
+${rows}
+];`;
+    setGeneratedData(output);
+    setShowDataDialog(true);
+  }
+  function lockMatchweek() {
+    if (!currentDay) return;
+    const weekMatches = currentDay.matches;
+
+    // Only lock if every match in the week has a score
+    const allScored = weekMatches.every(m => getScore(m) !== null || m[3] >= 0);
+    if (!allScored) {
+      setNotification("All matches in this matchweek must have scores before locking.");
+      setTimeout(() => setNotification(""), 4000);
+      return;
+    }
+
+    // Build map of scores to commit: only matches that came from enteredScores
+    const keysToLock = weekMatches
+      .map(m => scoreKey(m))
+      .filter(k => enteredScores[k] !== undefined);
+
+    if (keysToLock.length === 0) {
+      setNotification("No entered scores to lock in this matchweek.");
+      setTimeout(() => setNotification(""), 3000);
+      return;
+    }
+
+    // Load existing locked scores and merge in the new ones
+    let lockedMap = {};
+    try {
+      const existing = localStorage.getItem("mls_locked_scores");
+      if (existing) lockedMap = JSON.parse(existing);
+    } catch(e) {}
+
+    keysToLock.forEach(k => { lockedMap[k] = enteredScores[k]; });
+    localStorage.setItem("mls_locked_scores", JSON.stringify(lockedMap));
+
+    // Apply locked scores permanently into matches state
+    setMatches(prev => prev.map(m => {
+      const s = lockedMap[`${m[0]}|${m[1]}|${m[2]}`];
+      return s ? [m[0], m[1], m[2], s[0], s[1], m[5], m[6]] : m;
+    }));
+
+    // Remove locked keys from enteredScores
+    const remaining = { ...enteredScores };
+    keysToLock.forEach(k => delete remaining[k]);
+    setEnteredScores(remaining);
+    localStorage.setItem("mls_entered_scores", JSON.stringify(remaining));
+
+    setNotification(`Matchweek ${matchdayIdx + 1} locked — ${keysToLock.length} result${keysToLock.length > 1 ? "s" : ""} committed to match data.`);
+    setTimeout(() => setNotification(""), 5000);
+  }
+
+  function importScores(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        setEnteredScores(parsed);
+        localStorage.setItem("mls_entered_scores", JSON.stringify(parsed));
+        setNotification("Scores imported successfully!");
+        setTimeout(() => setNotification(""), 3000);
+      } catch(err) {
+        setNotification("Import failed — invalid file.");
+        setTimeout(() => setNotification(""), 3000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // reset so same file can be re-imported
+  }
+
+
+  function openAddMatch() {
+    setEditingMatch(null);
+    setNewMatch({ date: new Date().toISOString().slice(0,10), home: "", away: "", homeGoals: "", awayGoals: "", matchType: "Regular", seasonId: 31 });
+    setShowAddMatch(true);
+  }
+
+  function openEditMatch(m) {
+    setEditingMatch(m);
+    setNewMatch({
+      date: m[0],
+      home: m[1],
+      away: m[2],
+      homeGoals: m[3] >= 0 ? String(m[3]) : "",
+      awayGoals: m[4] >= 0 ? String(m[4]) : "",
+      matchType: m[5],
+      seasonId: m[6],
+    });
+    setShowAddMatch(true);
+  }
+
+  function addMatch() {
+    if (!newMatch.home || !newMatch.away || newMatch.homeGoals === "" || newMatch.awayGoals === "") {
+      setNotification("Please fill all required fields"); 
+      setTimeout(() => setNotification(""), 3000);
+      return;
+    }
+    const m = [
+      newMatch.date, newMatch.home, newMatch.away,
+      parseInt(newMatch.homeGoals), parseInt(newMatch.awayGoals),
+      newMatch.matchType, parseInt(newMatch.seasonId)
+    ];
+
+    let newMatches;
+    if (editingMatch) {
+      // Replace the existing match
+      const origKey = `${editingMatch[0]}|${editingMatch[1]}|${editingMatch[2]}`;
+      newMatches = matches.map(existing =>
+        `${existing[0]}|${existing[1]}|${existing[2]}` === origKey ? m : existing
+      );
+      // If the date/teams changed, also move any entered score
+      const newKey = `${m[0]}|${m[1]}|${m[2]}`;
+      if (origKey !== newKey && enteredScores[origKey]) {
+        const updatedScores = { ...enteredScores, [newKey]: enteredScores[origKey] };
+        delete updatedScores[origKey];
+        setEnteredScores(updatedScores);
+        localStorage.setItem("mls_entered_scores", JSON.stringify(updatedScores));
+      }
+    } else {
+      newMatches = [...matches, m];
+    }
+
+    setMatches(newMatches);
+    try {
+      const added = newMatches.slice(HISTORICAL_DATA.length);
+      localStorage.setItem("mls_added_matches", JSON.stringify(added));
+    } catch(e) {}
+    setShowAddMatch(false);
+    setEditingMatch(null);
+    const action = editingMatch ? "updated" : "added";
+        setNotification(`Match ${action}: ${newMatch.home} vs ${newMatch.away}`);
+    setTimeout(() => setNotification(""), 4000);
+    setNewMatch({date: new Date().toISOString().slice(0,10), home:"", away:"", homeGoals:"", awayGoals:"", matchType:"Regular", seasonId: 30});
+  }
+
+  const teamColor = TEAM_COLORS[selectedTeam] || "#1a1a2e";
+
+  const RecordBadge = ({w,l,d,label}) => (
+    <div style={{background:"rgba(255,255,255,0.07)", borderRadius:12, padding:"14px 20px", flex:1, minWidth:140}}>
+      <div style={{color:"#aaa", fontSize:10, textTransform:"uppercase", letterSpacing:3, marginBottom:6, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:600}}>{label}</div>
+      <div style={{fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:0.5}}>
+        {w}W – {l}L – {d}D
+      </div>
+      <div style={{color:"#888", fontSize:12, marginTop:4, fontFamily:"'Barlow', sans-serif"}}>
+        {w+l+d} GP · {((w/(w+l+d||1))*100).toFixed(1)}% win rate
+      </div>
+    </div>
+  );
+
+  // MLS league colors
+  const MLS_RED = "#C8102E";
+  const MLS_NAVY = "#002040";
+  const MLS_LTBLUE = "#69B3E7";
+
+  const currentDay = matchdays[matchdayIdx] || null;
+
+  return (
+    <div style={{
+      minHeight:"100vh", background:"#0f0f1a", color:"#fff",
+      fontFamily:"'Barlow', sans-serif", margin:0, padding:0
+    }}>
+      {/* Top nav bar with view toggle */}
+      <div className="mls-nav-outer" style={{background:"#09111f", borderBottom:"1px solid rgba(255,255,255,0.08)", padding:"0 24px"}}>
+        <div className="mls-nav" style={{maxWidth:1200, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", height:44}}>
+          <div className="mls-nav-left" style={{display:"flex", alignItems:"center", gap:10}}>
+            <img src={MLS_LOGO} alt="MLS"
+              onClick={() => isAdmin ? (setIsAdmin(false), setNotification("Switched to User mode."), setTimeout(() => setNotification(""), 3000)) : setShowAdminLogin(true)}
+              style={{height:28, width:"auto", filter:"drop-shadow(0 1px 3px rgba(0,0,0,0.5))", cursor:"pointer", opacity: isAdmin ? 1 : 0.85}}
+              title={isAdmin ? "Exit Admin mode" : "Admin login"}
+            />
+            <span style={{fontSize:12, color:"#666", textTransform:"uppercase", letterSpacing:3, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700}}>Match Tracker</span>
+            {isAdmin && (
+              <span style={{fontSize:10, color:"#27ae60", fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:1, textTransform:"uppercase", opacity:0.8}}>⚙ Admin</span>
+            )}
+          </div>
+          <div className="mls-nav-buttons" style={{display:"flex", gap:4}}>
+            {[["league","🏆","🏆 League View"],["standings","📊","📊 Standings"],["team","⚽","⚽ Team View"]].map(([v,icon,label]) => (
+              <button key={v} onClick={() => { if (v !== view) { setPrevView(view); setView(v); } }} style={{
+                background: view===v ? MLS_RED : "transparent",
+                color: view===v ? "#fff" : "#666",
+                border: view===v ? "none" : "1px solid rgba(255,255,255,0.1)",
+                borderRadius:6, padding:"5px 14px", cursor:"pointer",
+                fontSize:12, fontWeight:700, fontFamily:"'Barlow Condensed', sans-serif",
+                textTransform:"uppercase", letterSpacing:1
+              }}>{isMobile ? icon : label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════════ LEAGUE VIEW HEADER ═══════════════ */}
+      {view === "league" && (
+        <div style={{
+          background:`linear-gradient(135deg, ${MLS_NAVY} 0%, #0a0a1a 70%)`,
+          borderBottom:"1px solid rgba(255,255,255,0.1)", padding:"0 24px"
+        }}>
+          <div style={{maxWidth:1200, margin:"0 auto"}}>
+            <div className="mls-league-header-inner" style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 0 0"}}>
+              <div style={{display:"flex", alignItems:"center", gap:16}}>
+                <img src={MLS_LOGO} alt="MLS" style={{height:52, width:"auto", filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.6))"}} />
+                <div>
+                  <div style={{fontSize:11, color:"#888", textTransform:"uppercase", letterSpacing:4, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:600}}>League View</div>
+                  <div style={{fontSize:28, fontWeight:800, fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:0.5, textTransform:"uppercase", color:"#fff"}}>
+                    Major League Soccer
+                  </div>
+                </div>
+              </div>
+              <div className="mls-league-toolbar" style={{display:"flex", gap:8, alignItems:"center"}}>
+                <select value={leagueSeason} onChange={e => { const s = parseInt(e.target.value); const maxSeason = Math.max(...seasons); setLeagueSeason(s); setMatchdayIdx(s === maxSeason ? defaultMatchweekIdx : 0); }}
+                  style={{background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"8px 12px", fontSize:13}}>
+                  {seasons.slice().reverse().map(s => <option key={s} value={s} style={{background:"#1a1a2e"}}>Season {s} — {s + 1995}</option>)}
+                </select>
+                {isAdmin && (<>
+                <button onClick={exportScores}
+                  style={{background:"rgba(255,255,255,0.08)", color:"#aaa", border:"1px solid rgba(255,255,255,0.15)", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:700, fontSize:12, whiteSpace:"nowrap", fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}
+                  title="Export entered scores to a JSON file">
+                  ↓ Export
+                </button>
+                <button onClick={() => openAddMatch()}
+                  style={{background:"rgba(255,255,255,0.12)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:700, fontSize:12, whiteSpace:"nowrap", fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}>
+                  + Add Match
+                </button>
+                <label
+                  style={{background:"rgba(255,255,255,0.08)", color:"#aaa", border:"1px solid rgba(255,255,255,0.15)", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:700, fontSize:12, whiteSpace:"nowrap", fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}
+                  title="Import scores from a previously exported JSON file">
+                  ↑ Import
+                  <input type="file" accept=".json" onChange={importScores} style={{display:"none"}} />
+                </label>
+                <button onClick={generateHistoricalData}
+                  style={{background:"rgba(200,16,46,0.2)", color:"#ff8a9a", border:"1px solid rgba(200,16,46,0.4)", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:700, fontSize:12, whiteSpace:"nowrap", fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}
+                  title="Generate updated HISTORICAL_DATA to copy into your code">
+                  ⬇ Generate Data
+                </button>
+                </>)}
+              </div>
+            </div>
+            {/* Matchday nav */}
+            <div style={{display:"flex", alignItems:"center", gap:12, padding:"12px 0"}}>
+              <button onClick={() => setMatchdayIdx(i => Math.max(0, i-1))} disabled={matchdayIdx === 0}
+                style={{background:"rgba(255,255,255,0.1)", color: matchdayIdx===0 ? "#444" : "#fff", border:"none", borderRadius:6, padding:"6px 14px", cursor: matchdayIdx===0 ? "default" : "pointer", fontSize:18, lineHeight:1}}>‹</button>
+              <div style={{flex:1, overflowX:"auto", display:"flex", gap:6, paddingBottom:6}}>
+                {matchdays.map((md, i) => {
+                    const wkPlayed = md.matches.filter(m => getScore(m)!==null || m[3]>=0).length;
+                    const wkTotal = md.matches.length;
+                    const complete = wkPlayed === wkTotal && wkTotal > 0;
+                    const partial = wkPlayed > 0 && wkPlayed < wkTotal;
+                    return (
+                      <button key={i} onClick={() => setMatchdayIdx(i)} style={{
+                        background: i===matchdayIdx ? MLS_RED : complete ? "rgba(39,174,96,0.2)" : partial ? "rgba(243,156,18,0.15)" : "rgba(255,255,255,0.06)",
+                        color: i===matchdayIdx ? "#fff" : complete ? "#27ae60" : partial ? "#f39c12" : "#888",
+                        border: i===matchdayIdx ? "none" : complete ? "1px solid rgba(39,174,96,0.3)" : partial ? "1px solid rgba(243,156,18,0.25)" : "none",
+                        borderRadius:6, padding:"5px 10px", cursor:"pointer",
+                        fontSize:11, fontWeight:700, fontFamily:"'Barlow Condensed', sans-serif",
+                        whiteSpace:"nowrap", flexShrink:0,
+                        textTransform:"uppercase", letterSpacing:0.5
+                      }}>
+                        {i+1}
+                      </button>
+                    );
+                  })}
+              </div>
+              <button onClick={() => setMatchdayIdx(i => Math.min(matchdays.length-1, i+1))} disabled={matchdayIdx === matchdays.length-1}
+                style={{background:"rgba(255,255,255,0.1)", color: matchdayIdx===matchdays.length-1 ? "#444" : "#fff", border:"none", borderRadius:6, padding:"6px 14px", cursor: matchdayIdx===matchdays.length-1 ? "default" : "pointer", fontSize:18, lineHeight:1}}>›</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════ STANDINGS VIEW HEADER ═══════════════ */}
+      {view === "standings" && (
+        <div style={{
+          background:`linear-gradient(135deg, #002040 0%, #0a0a1a 70%)`,
+          borderBottom:"1px solid rgba(255,255,255,0.1)", padding:"0 24px"
+        }}>
+          <div style={{maxWidth:1200, margin:"0 auto"}}>
+            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 0 12px"}}>
+              <div style={{display:"flex", alignItems:"center", gap:16}}>
+                <img src={MLS_LOGO} alt="MLS" style={{height:52, width:"auto", filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.6))"}} />
+                <div>
+                  <div style={{fontSize:11, color:"#888", textTransform:"uppercase", letterSpacing:4, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:600}}>Standings</div>
+                  <div style={{fontSize:28, fontWeight:800, fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:0.5, textTransform:"uppercase", color:"#fff"}}>
+                    {standingsSeason + 1995} Season
+                  </div>
+                </div>
+              </div>
+              <select value={standingsSeason} onChange={e => setStandingsSeason(parseInt(e.target.value))}
+                style={{background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"8px 12px", fontSize:13}}>
+                {seasons.slice().reverse().map(s => (
+                  <option key={s} value={s} style={{background:"#1a1a2e"}}>{s + 1995} — Season {s}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════ TEAM VIEW HEADER ═══════════════ */}
+      {view === "team" && (
+      <div style={{
+        background:`linear-gradient(135deg, ${teamColor}cc 0%, #0f0f1a 60%)`,
+        borderBottom:"1px solid rgba(255,255,255,0.1)",
+        padding:"0 24px"
+      }}>
+        <div style={{maxWidth:1200, margin:"0 auto"}}>
+          <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 0 0"}}>
+            <div style={{display:"flex", alignItems:"center", gap:16}}>
+              <TeamBadge team={selectedTeam} size={52} />
+              <div>
+                <div style={{fontSize:11, color:"#888", textTransform:"uppercase", letterSpacing:4, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:600}}>MLS Match Tracker</div>
+                <div style={{fontSize:28, fontWeight:800, fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:0.5, textTransform:"uppercase"}}>
+                  {selectedTeam}
+                </div>
+              </div>
+            </div>
+            <div style={{display:"flex", gap:8, alignItems:"center"}}>
+              <select
+                value={selectedTeam}
+                onChange={e => { setSelectedTeam(e.target.value); setVsTeam(""); setDashboardSeason(null); }}
+                style={{
+                  background:"rgba(255,255,255,0.1)", color:"#fff",
+                  border:"1px solid rgba(255,255,255,0.2)", borderRadius:8,
+                  padding:"8px 12px", fontSize:13,
+                  fontFamily:"'Barlow', sans-serif"
+                }}
+              >
+                {ALL_TEAMS.map(t => <option key={t} value={t} style={{background:"#1a1a2e"}}>{t}</option>)}
+              </select>
+
+            </div>
+          </div>
+          {/* Tabs */}
+          <div style={{display:"flex", gap:4, marginTop:8}}>
+            {["dashboard","history","h2h","seasons"].map(t => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                style={{
+                  background: tab===t ? "rgba(255,255,255,0.15)" : "transparent",
+                  color: tab===t ? "#fff" : "#888",
+                  border:"none", borderBottom: tab===t ? `2px solid ${teamColor}` : "2px solid transparent",
+                  padding:"10px 16px", cursor:"pointer", fontSize:14, fontWeight:700,
+                  textTransform:"uppercase", letterSpacing:1.5,
+                  fontFamily:"'Barlow Condensed', sans-serif"
+                }}
+              >{t === "h2h" ? "Head to Head" : t.charAt(0).toUpperCase()+t.slice(1)}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+      )}
+
+      {notification && (
+        <div style={{
+          position:"fixed", top:20, right:20, background:"#27ae60", color:"#fff",
+          padding:"12px 20px", borderRadius:10, zIndex:100, fontWeight:600
+        }}>{notification}</div>
+      )}
+
+      {/* ═══════════════ LEAGUE VIEW CONTENT ═══════════════ */}
+      {view === "league" && currentDay && (
+        <div className="mls-content" style={{maxWidth:1200, margin:"0 auto", padding: isMobile ? "12px" : "24px"}}>
+          {/* Matchday header */}
+          <div style={{marginBottom:20}}>
+            <div style={{display:"flex", alignItems:"baseline", gap:12, marginBottom:4}}>
+              <span style={{fontSize:22, fontWeight:800, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}>
+                Matchweek {matchdayIdx + 1}
+              </span>
+              <span style={{fontSize:13, color:"#888"}}>
+                {(() => {
+                    const mon = new Date(currentDay.weekStart + 'T12:00:00');
+                    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                    return `${mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${sun.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+                  })()}
+              </span>
+              <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap:8}}>
+                {(() => {
+                  const total = currentDay.matches.length;
+                  const played = currentDay.matches.filter(m => getScore(m) !== null || m[3] >= 0).length;
+                  const allLocked = currentDay.matches.every(m => m[3] >= 0 && enteredScores[scoreKey(m)] === undefined);
+                  const allScored = played === total;
+                  return (
+                    <>
+                      <span style={{fontSize:12, color:"#666", background:"rgba(255,255,255,0.05)", padding:"3px 10px", borderRadius:20, fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:1}}>
+                        {played > 0 ? `${played}/${total} played` : `${total} matches`}
+                      </span>
+                      {allScored && !allLocked && isAdmin && (
+                        <button onClick={lockMatchweek} style={{
+                          background:"rgba(39,174,96,0.2)", color:"#27ae60",
+                          border:"1px solid rgba(39,174,96,0.4)",
+                          borderRadius:6, padding:"4px 12px", cursor:"pointer",
+                          fontWeight:700, fontFamily:"'Barlow Condensed', sans-serif",
+                          textTransform:"uppercase", letterSpacing:1, fontSize:11,
+                          whiteSpace:"nowrap",
+                        }}
+                          title="Permanently commit all entered scores into match data"
+                        >
+                          🔒 Lock Results
+                        </button>
+                      )}
+                      {allLocked && (
+                        <span style={{fontSize:11, color:"#27ae60", fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:1, textTransform:"uppercase", opacity:0.7}}>
+                          ✓ Locked
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
+                <button onClick={() => setMatchdayIdx(i => Math.max(0, i-1))} disabled={matchdayIdx===0}
+                  style={{background:"rgba(255,255,255,0.08)", color: matchdayIdx===0 ? "#444" : "#fff", border:"none", borderRadius:6, padding:"4px 12px", cursor: matchdayIdx===0 ? "default" : "pointer", fontWeight:700, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1, fontSize:12}}>
+                  ‹ Prev
+                </button>
+                <button onClick={() => setMatchdayIdx(i => Math.min(matchdays.length-1, i+1))} disabled={matchdayIdx===matchdays.length-1}
+                  style={{background:"rgba(255,255,255,0.08)", color: matchdayIdx===matchdays.length-1 ? "#444" : "#fff", border:"none", borderRadius:6, padding:"4px 12px", cursor: matchdayIdx===matchdays.length-1 ? "default" : "pointer", fontWeight:700, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1, fontSize:12}}>
+                  Next ›
+                </button>
+              </div>
+            </div>
+            {/* Type breakdown pills */}
+            {[...new Set(currentDay.matches.map(m => m[5]))].map(type => (
+              <span key={type} style={{
+                display:"inline-block", marginRight:6,
+                fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:1.5,
+                padding:"2px 8px", borderRadius:20,
+                background: type==="Regular" ? "rgba(105,179,231,0.15)" : "rgba(200,16,46,0.2)",
+                color: type==="Regular" ? "#69B3E7" : "#ff6b7a",
+                fontFamily:"'Barlow Condensed', sans-serif"
+              }}>{type}</span>
+            ))}
+          </div>
+
+          {/* Match cards grouped by date */}
+          {currentDay.dates.map(date => {
+            const dayMatches = currentDay.matches.filter(m => m[0] === date)
+              .sort((a,b) => a[1].localeCompare(b[1]));
+            const dateLabel = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+            return (
+              <div key={date} style={{marginBottom:16}}>
+                {currentDay.dates.length > 1 && (
+                  <div style={{fontSize:11, color:"#555", textTransform:"uppercase", letterSpacing:2, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700, marginBottom:8, paddingBottom:6, borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                    {dateLabel}
+                  </div>
+                )}
+                <div style={{display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))", gap:10}}>
+                  {dayMatches.map((m, i) => {
+                    const homeColor = TEAM_COLORS[m[1]] || "#333";
+                    const awayColor = TEAM_COLORS[m[2]] || "#333";
+                    const matchTypeBadge = m[5] !== "Regular" ? m[5] : null;
+                    const enteredScore = getScore(m);
+                    const hgDisplay = enteredScore ? enteredScore[0] : (m[3] >= 0 ? m[3] : null);
+                    const agDisplay = enteredScore ? enteredScore[1] : (m[4] >= 0 ? m[4] : null);
+                    const isPlayed = hgDisplay !== null;
+                    const pd = isPlayed ? getPenData(m) : null;
+                    const penW = isPlayed ? penWinner(m) : null;
+                    const hWon = isPlayed && (hgDisplay > agDisplay || penW === m[1]);
+                    const aWon = isPlayed && (agDisplay > hgDisplay || penW === m[2]);
+                    const draw = isPlayed && hgDisplay === agDisplay && !penW;
+                    return (
+                        <div key={i} style={{
+                          background: isPlayed ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
+                          border: `1px solid ${isPlayed ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.04)"}`,
+                          borderRadius:12, overflow:"hidden",
+                          transition:"background 0.15s", position:"relative"
+                        }}>
+                          {/* Colored top bar split home/away */}
+                          <div style={{height:3, background:`linear-gradient(90deg, ${homeColor} 50%, ${awayColor} 50%)`}} />
+                          <div style={{padding:"12px 14px"}}>
+                            {matchTypeBadge && (
+                              <div style={{fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:1.5, color:"#ff6b7a", marginBottom:6, fontFamily:"'Barlow Condensed', sans-serif"}}>{matchTypeBadge}</div>
+                            )}
+                            {/* Home team row */}
+                            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8}}>
+                              <div style={{display:"flex", alignItems:"center", gap:8, flex:1, minWidth:0}}>
+                                <TeamBadge team={m[1]} size={28} />
+                                <span style={{fontSize:13, fontWeight: hWon ? 800 : 500, color: hWon ? "#fff" : "#bbb", fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:0.5, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{m[1]}</span>
+                              </div>
+                              <span style={{fontSize:22, fontWeight:900, fontFamily:"'Barlow Condensed', sans-serif", color: hWon ? "#fff" : draw ? "#f39c12" : isPlayed ? "#888" : "#333", minWidth:24, textAlign:"right", marginLeft:8}}>
+                                {isPlayed ? hgDisplay : "–"}
+                              </span>
+                            </div>
+                            {/* Away team row */}
+                            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+                              <div style={{display:"flex", alignItems:"center", gap:8, flex:1, minWidth:0}}>
+                                <TeamBadge team={m[2]} size={28} />
+                                <span style={{fontSize:13, fontWeight: aWon ? 800 : 500, color: aWon ? "#fff" : "#bbb", fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:0.5, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{m[2]}</span>
+                              </div>
+                              <span style={{fontSize:22, fontWeight:900, fontFamily:"'Barlow Condensed', sans-serif", color: aWon ? "#fff" : draw ? "#f39c12" : isPlayed ? "#888" : "#333", minWidth:24, textAlign:"right", marginLeft:8}}>
+                                {isPlayed ? agDisplay : "–"}
+                              </span>
+                            </div>
+                            {/* Penalty display */}
+                            {pd && (
+                              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center",
+                                marginTop:4, paddingTop:4, borderTop:"1px solid rgba(255,255,255,0.07)",
+                                fontSize:10, fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:1}}>
+                                <span style={{color:"#666", textTransform:"uppercase"}}>Penalties</span>
+                                {pd.h != null ? (
+                                  <span>
+                                    <span style={{fontWeight:800, color: penW===m[1] ? "#fff" : "#555"}}>{pd.h}</span>
+                                    <span style={{color:"#444"}}> – </span>
+                                    <span style={{fontWeight:800, color: penW===m[2] ? "#fff" : "#555"}}>{pd.a}</span>
+                                  </span>
+                                ) : (
+                                  <span style={{color:"#888", fontStyle:"italic"}}>{penW} win</span>
+                                )}
+                              </div>
+                            )}
+                            {/* Action row */}
+                            <div style={{display:"flex", gap:6, marginTop:10, justifyContent:"flex-end"}}>
+                              {isPlayed && (
+                                <button onClick={() => { setView("team"); setSelectedTeam(m[1]); setTab("history"); setVsTeam(m[2]); }}
+                                  style={{fontSize:10, color:"#69B3E7", background:"none", border:"none", cursor:"pointer", padding:"2px 0", fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:1, textTransform:"uppercase"}}>
+                                  View H2H ›
+                                </button>
+                              )}
+                              {isAdmin && (<>
+                              {enteredScore && (
+                                <button onClick={() => deleteScore(m)}
+                                  style={{fontSize:10, color:"#e74c3c", background:"none", border:"none", cursor:"pointer", padding:"2px 0", fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:1, textTransform:"uppercase"}}>
+                                  ✕ Remove
+                                </button>
+                              )}
+                              <button
+                                onClick={() => { setScoreEntry({ match: m }); setScoreInput({ hg: isPlayed ? String(hgDisplay) : "", ag: isPlayed ? String(agDisplay) : "" }); }}
+                                style={{
+                                  fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:1,
+                                  background: isPlayed ? "rgba(255,255,255,0.08)" : "rgba(200,16,46,0.25)",
+                                  color: isPlayed ? "#aaa" : "#ff8a9a",
+                                  border: isPlayed ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(200,16,46,0.4)",
+                                  borderRadius:4, padding:"3px 8px", cursor:"pointer",
+                                  fontFamily:"'Barlow Condensed', sans-serif"
+                                }}>
+                                {isPlayed ? "Edit Score" : "+ Enter Score"}
+                              </button>
+                              </>)}
+                              <button onClick={() => openEditMatch(m)}
+                                style={{fontSize:10, color:"#888", background:"none", border:"none", cursor:"pointer", padding:"2px 0", fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:1, textTransform:"uppercase", display: isAdmin ? "block" : "none"}}>
+                                ✎ Edit Match
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+        </div>
+      )}
+
+      {/* ═══════════════ STANDINGS VIEW CONTENT ═══════════════ */}
+      {view === "standings" && (
+        <div style={{maxWidth:1200, margin:"0 auto", padding:"24px"}}>
+          {standingsData.length === 0 ? (
+            <div style={{color:"#555", fontSize:14, textAlign:"center", padding:"40px 0"}}>No matches played yet for this season.</div>
+          ) : (() => {
+            const StandingsTable = ({rows, title, color}) => (
+              <div style={{background:"rgba(255,255,255,0.03)", borderRadius:12, overflow:"hidden", display:"flex", flexDirection:"column"}}>
+                {/* Table title */}
+                <div style={{background:`linear-gradient(90deg, ${color}33 0%, transparent 100%)`, borderBottom:`2px solid ${color}66`, padding:"12px 16px", display:"flex", alignItems:"center", gap:10}}>
+                  <div style={{width:4, height:20, background:color, borderRadius:2}} />
+                  <span style={{fontSize:14, fontWeight:800, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:2, color:"#fff"}}>{title}</span>
+                </div>
+                {/* Header row */}
+                <div style={{display:"grid", gridTemplateColumns: isMobile ? "24px 1fr 36px 36px 36px 36px 42px 42px 42px 50px" : "32px 1fr 44px 44px 44px 44px 52px 52px 52px 60px", padding: isMobile ? "6px 8px" : "8px 14px", background:"rgba(255,255,255,0.06)", fontSize: isMobile ? 10 : 11, color:"#666", textTransform:"uppercase", letterSpacing:2, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700}}>
+                  <span>#</span><span>Club</span>
+                  <span style={{textAlign:"center"}}>GP</span>
+                  <span style={{textAlign:"center", color:"#27ae60"}}>W</span>
+                  <span style={{textAlign:"center", color:"#e74c3c"}}>L</span>
+                  <span style={{textAlign:"center", color:"#f39c12"}}>D</span>
+                  <span style={{textAlign:"center"}}>GF</span>
+                  <span style={{textAlign:"center"}}>GA</span>
+                  <span style={{textAlign:"center"}}>GD</span>
+                  <span style={{textAlign:"center", color:"#fff"}}>PTS</span>
+                </div>
+                {/* Data rows — fixed height for consistency */}
+                <div style={{flex:1, display:"flex", flexDirection:"column"}}>
+                  {rows.map((r, i) => {
+                    const gd = r.gf - r.ga;
+                    return (
+                      <div key={i} onClick={() => { setView("team"); setSelectedTeam(r.team); setTab("dashboard"); }}
+                        style={{display:"grid", gridTemplateColumns: isMobile ? "24px 1fr 36px 36px 36px 36px 42px 42px 42px 50px" : "32px 1fr 44px 44px 44px 44px 52px 52px 52px 60px", padding: isMobile ? "0 8px" : "0 14px", height:48, minHeight:48, maxHeight:48, borderBottom:"1px solid rgba(255,255,255,0.04)", fontSize:13, alignItems:"center", flex:"0 0 48px", background: i%2===0 ? "transparent" : "rgba(255,255,255,0.02)", cursor:"pointer", transition:"background 0.15s", overflow:"hidden"}}
+                        onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.07)"}
+                        onMouseLeave={e => e.currentTarget.style.background= i%2===0 ? "transparent" : "rgba(255,255,255,0.02)"}
+                      >
+                        <span style={{color:"#555", fontWeight:700, fontFamily:"'Barlow Condensed', sans-serif"}}>{i+1}</span>
+                        <span style={{display:"flex", alignItems:"center", gap:8, minWidth:0}}>
+                          <TeamBadge team={r.team} size={22} />
+                          <span style={{fontWeight:600, fontSize:13}}>{r.team}</span>
+                        </span>
+                        <span style={{textAlign:"center", color:"#aaa"}}>{r.gp}</span>
+                        <span style={{textAlign:"center", color:"#27ae60", fontWeight:600}}>{r.w}</span>
+                        <span style={{textAlign:"center", color:"#e74c3c", fontWeight:600}}>{r.l}</span>
+                        <span style={{textAlign:"center", color:"#f39c12", fontWeight:600}}>{r.d}</span>
+                        <span style={{textAlign:"center"}}>{r.gf}</span>
+                        <span style={{textAlign:"center"}}>{r.ga}</span>
+                        <span style={{textAlign:"center", color: gd > 0 ? "#27ae60" : gd < 0 ? "#e74c3c" : "#aaa"}}>{gd > 0 ? `+${gd}` : gd}</span>
+                        <span style={{textAlign:"center", fontWeight:800, fontSize:15, fontFamily:"'Barlow Condensed', sans-serif", color:"#fff"}}>{r.pts}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+
+            return (
+              <>
+                {/* Conference Standings */}
+                <div style={{marginBottom:8}}>
+                  <h2 style={{margin:"0 0 16px", fontSize:16, fontWeight:800, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:2, color:"#aaa"}}>Conference Standings</h2>
+                  <div style={{display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:20, alignItems:"stretch", marginBottom:28}}>
+                    <StandingsTable rows={eastStandings} title="Eastern Conference" color="#C8102E" />
+                    <StandingsTable rows={westStandings} title="Western Conference" color="#69B3E7" />
+                  </div>
+                </div>
+
+                {/* Supporters Shield */}
+                <div>
+                  <h2 style={{margin:"0 0 16px", fontSize:16, fontWeight:800, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:2, color:"#aaa"}}>
+                    Supporters Shield
+                    <span style={{marginLeft:12, fontSize:11, color:"#555", fontWeight:500, letterSpacing:1}}>All Conferences Combined</span>
+                  </h2>
+                  <StandingsTable rows={standingsData} title="Supporters Shield Standings" color="#ECE83A" />
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ═══════════════ TEAM VIEW CONTENT ═══════════════ */}
+      {view === "team" && (
+      <div style={{maxWidth:1200, margin:"0 auto", padding:"24px"}}>
+
+        {/* DASHBOARD TAB */}
+        {tab === "dashboard" && (
+          <div>
+
+            {/* ── SEASON STATS ── */}
+            <div style={{background:"rgba(255,255,255,0.03)", borderRadius:14, padding:20, marginBottom:20, border:"1px solid rgba(255,255,255,0.07)"}}>
+              {/* Season selector header */}
+              <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16}}>
+                <h3 style={{margin:0, fontSize:13, color:"#aaa", textTransform:"uppercase", letterSpacing:3, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700}}>Season Stats</h3>
+                <select
+                  value={dashboardSeason ?? dashboardSeasonId ?? ""}
+                  onChange={e => setDashboardSeason(e.target.value === "" ? null : parseInt(e.target.value))}
+                  style={{background:"rgba(255,255,255,0.08)", color:"#fff", border:"1px solid rgba(255,255,255,0.15)", borderRadius:7, padding:"5px 10px", fontSize:12, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700, letterSpacing:1, textTransform:"uppercase", cursor:"pointer"}}
+                >
+                  {playedSeasons.slice().reverse().map(s => (
+                    <option key={s} value={s} style={{background:"#1a1a2e"}}>Season {s}</option>
+                  ))}
+                </select>
+              </div>
+              {seasonTeamMatches.length === 0 ? (
+                <div style={{color:"#555", fontSize:13, textAlign:"center", padding:"16px 0"}}>No matches played this season yet.</div>
+              ) : (
+                <>
+                  {/* Season record badges */}
+                  <div style={{display:"flex", gap:12, flexWrap:"wrap", marginBottom:16}}>
+                    <RecordBadge {...calcRecord(seasonTeamMatches, selectedTeam)} label={`Season ${dashboardSeasonId}`} />
+                    <RecordBadge {...calcRecord(seasonHomeMatches, selectedTeam)} label="Home" />
+                    <RecordBadge {...calcRecord(seasonAwayMatches, selectedTeam)} label="Away" />
+                    <div style={{background:"rgba(255,255,255,0.07)", borderRadius:12, padding:"14px 20px", flex:1, minWidth:140}}>
+                      <div style={{color:"#aaa", fontSize:10, textTransform:"uppercase", letterSpacing:3, marginBottom:6, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:600}}>Goals</div>
+                      <div style={{fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:0.5}}>
+                        {calcRecord(seasonTeamMatches, selectedTeam).gf} / {calcRecord(seasonTeamMatches, selectedTeam).ga}
+                      </div>
+                      <div style={{color:"#888", fontSize:12, marginTop:4, fontFamily:"'Barlow', sans-serif"}}>
+                        GF / GA · GD {calcRecord(seasonTeamMatches, selectedTeam).gd > 0 ? "+" : ""}{calcRecord(seasonTeamMatches, selectedTeam).gd}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Season home vs away bars */}
+                  {[
+                    {label:"Win %", home:(calcRecord(seasonHomeMatches,selectedTeam).w/(seasonHomeMatches.length||1)*100).toFixed(1), away:(calcRecord(seasonAwayMatches,selectedTeam).w/(seasonAwayMatches.length||1)*100).toFixed(1), pct:true},
+                    {label:"Goals/Game", home:(calcRecord(seasonHomeMatches,selectedTeam).gf/(seasonHomeMatches.length||1)).toFixed(2), away:(calcRecord(seasonAwayMatches,selectedTeam).gf/(seasonAwayMatches.length||1)).toFixed(2)},
+                    {label:"Goals Allowed/Game", home:(calcRecord(seasonHomeMatches,selectedTeam).ga/(seasonHomeMatches.length||1)).toFixed(2), away:(calcRecord(seasonAwayMatches,selectedTeam).ga/(seasonAwayMatches.length||1)).toFixed(2)},
+                  ].map(row => (
+                    <div key={row.label} style={{display:"flex", alignItems:"center", marginBottom:10, gap:12}}>
+                      <div style={{width:160, color:"#888", fontSize:13}}>{row.label}</div>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex", justifyContent:"space-between", marginBottom:3}}>
+                          <span style={{color:"#6af", fontSize:12}}>Home: {row.home}{row.pct ? "%" : ""}</span>
+                          <span style={{color:"#fa8", fontSize:12}}>Away: {row.away}{row.pct ? "%" : ""}</span>
+                        </div>
+                        <div style={{height:6, background:"rgba(255,255,255,0.1)", borderRadius:3, overflow:"hidden"}}>
+                          <div style={{height:"100%", width:`${parseFloat(row.home)/(parseFloat(row.home)+parseFloat(row.away)||1)*100}%`, background:"linear-gradient(90deg, #6af, #8af)", borderRadius:3}} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Form guide */}
+                  {(() => {
+                    const regularMatches = [...effectiveMatches]
+                      .filter(m => m[5] === "Regular" && m[6] === dashboardSeasonId &&
+                        (m[1] === selectedTeam || m[2] === selectedTeam))
+                      .sort((a, b) => a[0].localeCompare(b[0]));
+                    if (regularMatches.length === 0) return null;
+                    return (
+                      <div style={{marginTop:16, paddingTop:14, borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                        <div style={{fontSize:10, color:"#666", textTransform:"uppercase", letterSpacing:3, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700, marginBottom:8}}>Form Guide</div>
+                        <div style={{display:"flex", gap:3}}>
+                          {regularMatches.map((m, i) => {
+                            const played = m[3] >= 0;
+                            const res = played ? getResult(m, selectedTeam) : null;
+                            const bg = !played ? "rgba(255,255,255,0.05)"
+                              : res === "W" ? "#27ae60"
+                              : res === "L" ? "#e74c3c"
+                              : "#f39c12";
+                            const isHome = m[1] === selectedTeam;
+                            const opp = isHome ? m[2] : m[1];
+                            const score = played ? (isHome ? `${m[3]}–${m[4]}` : `${m[4]}–${m[3]}`) : "unplayed";
+                            return (
+                              <div
+                                key={i}
+                                title={`${m[0]}: ${isHome ? "vs" : "@"} ${opp} ${score}`}
+                                style={{
+                                  flex: 1,
+                                  aspectRatio: "1",
+                                  background: bg,
+                                  borderRadius: 4,
+                                  border: played ? "none" : "1px solid rgba(255,255,255,0.08)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: regularMatches.length > 25 ? 7 : 9,
+                                  fontWeight: 800,
+                                  color: res === "D" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.9)",
+                                  fontFamily: "'Barlow Condensed', sans-serif",
+                                  minWidth: 0,
+                                  cursor: "default",
+                                }}
+                              >
+                                {res || ""}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+
+                                    {/* Season match list */}
+            <div style={{background:"rgba(255,255,255,0.05)", borderRadius:12, padding:20}}>
+              <h3 style={{margin:"0 0 16px", fontSize:13, color:"#aaa", textTransform:"uppercase", letterSpacing:3, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700}}>
+                Season {dashboardSeasonId} Schedule / Results
+              </h3>
+              {seasonAllMatches.length === 0 ? (
+                <div style={{color:"#555", fontSize:13, textAlign:"center", padding:"16px 0"}}>No matches scheduled this season.</div>
+              ) : (() => {
+                const isCurrentSeason = dashboardSeasonId === Math.max(...seasons);
+                const played = [...seasonAllMatches].filter(m => m[3] >= 0).sort((a,b) => b[0].localeCompare(a[0]));
+                const upcoming = [...seasonAllMatches].filter(m => m[3] < 0).sort((a,b) => a[0].localeCompare(b[0]));
+                const MatchRow = ({m, rowKey}) => {
+                  const isHome = m[1] === selectedTeam;
+                  const res = getResult(m, selectedTeam);
+                  const resColor = res==="W" ? "#27ae60" : res==="L" ? "#e74c3c" : "#f39c12";
+                  return (
+                    <div key={rowKey} style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0", borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                      <div style={{display:"flex", alignItems:"center", gap:12}}>
+                        <div style={{width:28, height:28, borderRadius:"50%", background: res ? resColor : "rgba(255,255,255,0.07)", border: res ? "none" : "1px solid rgba(255,255,255,0.12)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:12, color: res ? "#fff" : "#555"}}>{res || "·"}</div>
+                        <div>
+                          <div style={{display:"flex", alignItems:"center", gap:8}}>
+                            <TeamBadge team={isHome ? m[2] : m[1]} size={20} />
+                            <span style={{fontSize:14, fontWeight:600}}>{isHome ? `vs ${m[2]}` : `@ ${m[1]}`}</span>
+                            <span style={{fontSize:10, color:"#888", background:"rgba(255,255,255,0.1)", padding:"2px 6px", borderRadius:4}}>{isHome ? "H" : "A"}</span>
+                          </div>
+                          <div style={{fontSize:11, color:"#888", marginTop:2}}>{m[0]} · {m[5]}</div>
+                        </div>
+                      </div>
+                      <div style={{fontSize:20, fontWeight:800, fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:0.5, color: res ? "#fff" : "#444"}}>
+                        {res ? (isHome ? `${m[3]} – ${m[4]}` : `${m[4]} – ${m[3]}`) : "– –"}
+                      </div>
+                    </div>
+                  );
+                };
+                if (!isCurrentSeason) {
+                  return [...played].reverse().map((m, i) => <MatchRow key={i} m={m} rowKey={i} />);
+                }
+                return (
+                  <>
+                    {played.length > 0 && (
+                      <>
+                        <div style={{fontSize:10, color:"#666", textTransform:"uppercase", letterSpacing:3, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700, marginBottom:6}}>Results — {played.length} played</div>
+                        {played.map((m, i) => <MatchRow key={`p${i}`} m={m} rowKey={`p${i}`} />)}
+                      </>
+                    )}
+                    {upcoming.length > 0 && (
+                      <>
+                        <div style={{fontSize:10, color:"#666", textTransform:"uppercase", letterSpacing:3, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700, marginTop: played.length > 0 ? 20 : 0, marginBottom:6, paddingTop: played.length > 0 ? 16 : 0, borderTop: played.length > 0 ? "1px solid rgba(255,255,255,0.08)" : "none"}}>Upcoming — {upcoming.length} remaining</div>
+                        {upcoming.map((m, i) => <MatchRow key={`u${i}`} m={m} rowKey={`u${i}`} />)}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* HISTORY TAB */}
+        {tab === "history" && (
+          <div>
+            {/* ── FILTERED STATS ── */}
+            {filteredMatches.length > 0 && (() => {
+              const filtHomeMatches = filteredMatches.filter(m => m[1] === selectedTeam);
+              const filtAwayMatches = filteredMatches.filter(m => m[2] === selectedTeam);
+              const rec = calcRecord(filteredMatches, selectedTeam);
+              const homeRec = calcRecord(filtHomeMatches, selectedTeam);
+              const awayRec = calcRecord(filtAwayMatches, selectedTeam);
+              return (
+                <div style={{marginBottom:20}}>
+                  <div style={{display:"flex", gap:12, flexWrap:"wrap", marginBottom:16}}>
+                    <RecordBadge {...rec} label="Filtered" />
+                    <RecordBadge {...homeRec} label="Home" />
+                    <RecordBadge {...awayRec} label="Away" />
+                    <div style={{background:"rgba(255,255,255,0.07)", borderRadius:12, padding:"14px 20px", flex:1, minWidth:140}}>
+                      <div style={{color:"#aaa", fontSize:10, textTransform:"uppercase", letterSpacing:3, marginBottom:6, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:600}}>Goals</div>
+                      <div style={{fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:0.5}}>
+                        {rec.gf} / {rec.ga}
+                      </div>
+                      <div style={{color:"#888", fontSize:12, marginTop:4, fontFamily:"'Barlow', sans-serif"}}>
+                        GF / GA · GD {rec.gd > 0 ? "+" : ""}{rec.gd}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{background:"rgba(255,255,255,0.05)", borderRadius:12, padding:20, marginBottom:16}}>
+                    <h3 style={{margin:"0 0 16px", fontSize:13, color:"#aaa", textTransform:"uppercase", letterSpacing:3, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700}}>Home vs Away Performance</h3>
+                    {[
+                      {label:"Win %", home:(homeRec.w/(homeRec.w+homeRec.l+homeRec.d||1)*100).toFixed(1), away:(awayRec.w/(awayRec.w+awayRec.l+awayRec.d||1)*100).toFixed(1), pct:true},
+                      {label:"Goals/Game", home:(homeRec.gf/(filtHomeMatches.length||1)).toFixed(2), away:(awayRec.gf/(filtAwayMatches.length||1)).toFixed(2)},
+                      {label:"Goals Allowed/Game", home:(homeRec.ga/(filtHomeMatches.length||1)).toFixed(2), away:(awayRec.ga/(filtAwayMatches.length||1)).toFixed(2)},
+                    ].map(row => (
+                      <div key={row.label} style={{display:"flex", alignItems:"center", marginBottom:12, gap:12}}>
+                        <div style={{width:160, color:"#888", fontSize:13}}>{row.label}</div>
+                        <div style={{flex:1}}>
+                          <div style={{display:"flex", justifyContent:"space-between", marginBottom:4}}>
+                            <span style={{color:"#6af", fontSize:12}}>Home: {row.home}{row.pct ? "%" : ""}</span>
+                            <span style={{color:"#fa8", fontSize:12}}>Away: {row.away}{row.pct ? "%" : ""}</span>
+                          </div>
+                          <div style={{height:6, background:"rgba(255,255,255,0.1)", borderRadius:3, overflow:"hidden"}}>
+                            <div style={{height:"100%", width:`${parseFloat(row.home)/(parseFloat(row.home)+parseFloat(row.away)||1)*100}%`, background:"linear-gradient(90deg, #6af, #8af)", borderRadius:3}} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+            <div style={{display:"flex", gap:10, marginBottom:16, flexWrap:"wrap"}}>
+              <select value={vsTeam} onChange={e => setVsTeam(e.target.value)}
+                style={{background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"8px 12px", fontSize:13}}>
+                <option value="" style={{background:"#1a1a2e"}}>All Opponents</option>
+                {ALL_TEAMS.filter(t => t !== selectedTeam).map(t => <option key={t} value={t} style={{background:"#1a1a2e"}}>{t}</option>)}
+              </select>
+              <select value={filterType} onChange={e => setFilterType(e.target.value)}
+                style={{background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"8px 12px", fontSize:13}}>
+                <option value="All" style={{background:"#1a1a2e"}}>All Match Types</option>
+                {MATCH_TYPES.map(t => <option key={t} value={t} style={{background:"#1a1a2e"}}>{t}</option>)}
+              </select>
+              <select value={filterSeason} onChange={e => setFilterSeason(e.target.value)}
+                style={{background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"8px 12px", fontSize:13}}>
+                <option value="All" style={{background:"#1a1a2e"}}>All Seasons</option>
+                {playedSeasons.map(s => <option key={s} value={s} style={{background:"#1a1a2e"}}>Season {s}</option>)}
+              </select>
+            </div>
+            {/* Filtered record */}
+            <div style={{background:"rgba(255,255,255,0.07)", borderRadius:10, padding:"12px 16px", marginBottom:16, display:"flex", gap:20, alignItems:"center"}}>
+              <div style={{fontSize:13, color:"#888"}}>Filtered results ({filteredMatches.length} matches):</div>
+              <div style={{fontWeight:700, color:"#27ae60"}}>{overallRecord.w}W</div>
+              <div style={{fontWeight:700, color:"#e74c3c"}}>{overallRecord.l}L</div>
+              <div style={{fontWeight:700, color:"#f39c12"}}>{overallRecord.d}D</div>
+              <div style={{color:"#888", fontSize:13}}>GF: {overallRecord.gf} | GA: {overallRecord.ga} | GD: {overallRecord.gd > 0 ? "+" : ""}{overallRecord.gd}</div>
+            </div>
+            <div style={{background:"rgba(255,255,255,0.03)", borderRadius:12, overflow:"hidden"}}>
+              <div style={{
+                display:"grid", gridTemplateColumns:"100px 1fr 1fr 80px 60px 100px",
+                padding:"10px 16px", background:"rgba(255,255,255,0.07)",
+                fontSize:12, color:"#888", textTransform:"uppercase", letterSpacing:2, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700
+              }}>
+                <span>Date</span><span>Home</span><span>Away</span><span>Score</span><span>Result</span><span>Type</span>
+              </div>
+              {filteredMatches.slice(0,100).map((m,i) => {
+                const isHome = m[1] === selectedTeam;
+                const res = getResult(m, selectedTeam);
+                const resColor = res==="W" ? "#27ae60" : res==="L" ? "#e74c3c" : "#f39c12";
+                return (
+                  <div key={i} style={{
+                    display:"grid", gridTemplateColumns:"100px 1fr 1fr 80px 60px 100px",
+                    padding:"10px 16px", borderBottom:"1px solid rgba(255,255,255,0.04)",
+                    fontSize:13, alignItems:"center",
+                    background: i%2===0 ? "transparent" : "rgba(255,255,255,0.02)"
+                  }}>
+                    <span style={{color:"#888", fontSize:12}}>{m[0]}</span>
+                    <span style={{fontWeight: isHome ? 700 : 400, color: isHome ? "#fff" : "#aaa"}}>{m[1]}</span>
+                    <span style={{fontWeight: !isHome ? 700 : 400, color: !isHome ? "#fff" : "#aaa"}}>{m[2]}</span>
+                    <span style={{fontWeight:700}}>{m[3]} – {m[4]}</span>
+                    <span style={{color:resColor, fontWeight:700}}>{res}</span>
+                    <span style={{color:"#888", fontSize:11, background:"rgba(255,255,255,0.07)", padding:"2px 6px", borderRadius:4, display:"inline-block"}}>{m[5]}</span>
+                  </div>
+                );
+              })}
+              {filteredMatches.length > 100 && (
+                <div style={{padding:"12px 16px", color:"#888", fontSize:13, textAlign:"center"}}>
+                  Showing 100 of {filteredMatches.length} matches. Use filters to narrow results.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* HEAD TO HEAD TAB */}
+        {tab === "h2h" && (
+          <div>
+            <div style={{background:"rgba(255,255,255,0.03)", borderRadius:12, overflow:"hidden"}}>
+              {/* Sortable header */}
+              {(() => {
+                const cols = [
+                  {key:"opponent", label:"Opponent", color:null, align:"left"},
+                  {key:"gp",       label:"GP",       color:null},
+                  {key:"w",        label:"W",        color:"#27ae60"},
+                  {key:"l",        label:"L",        color:"#e74c3c"},
+                  {key:"d",        label:"D",        color:"#f39c12"},
+                  {key:"win",      label:"Win%",     color:null},
+                  {key:"gf",       label:"GF",       color:null},
+                  {key:"ga",       label:"GA",       color:null},
+                  {key:"gd",       label:"GD",       color:null},
+                ];
+                const SortIcon = ({col}) => {
+                  if (h2hSort.col !== col) return <span style={{opacity:0.25, marginLeft:3}}>↕</span>;
+                  return <span style={{marginLeft:3}}>{h2hSort.dir === "asc" ? "↑" : "↓"}</span>;
+                };
+                const onSort = (col) => {
+                  setH2hSort(prev => prev.col === col
+                    ? {col, dir: prev.dir === "desc" ? "asc" : "desc"}
+                    : {col, dir: col === "opponent" ? "asc" : "desc"}
+                  );
+                };
+                const sortFn = (a, b) => {
+                  const {col, dir} = h2hSort;
+                  const mul = dir === "asc" ? 1 : -1;
+                  if (col === "opponent") return mul * a.opponent.localeCompare(b.opponent);
+                  if (col === "win") {
+                    const wa = a.w/(a.gp||1), wb = b.w/(b.gp||1);
+                    return mul * (wa - wb);
+                  }
+                  return mul * ((a[col]||0) - (b[col]||0));
+                };
+                const sorted = [...h2hData].sort(sortFn);
+                return (
+                  <>
+                    <div style={{
+                      display:"grid", gridTemplateColumns: isMobile ? "1fr 44px 44px 44px 44px 54px 54px 54px 54px" : "1fr 60px 60px 60px 60px 80px 80px 80px 80px",
+                      padding: isMobile ? "8px 10px" : "10px 16px", background:"rgba(255,255,255,0.07)",
+                      fontSize:12, textTransform:"uppercase", letterSpacing:2,
+                      fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700
+                    }}>
+                      {cols.map(c => (
+                        <div key={c.key} onClick={() => onSort(c.key)} style={{
+                          cursor:"pointer", userSelect:"none",
+                          color: h2hSort.col === c.key ? "#fff" : (c.color || "#888"),
+                          whiteSpace:"nowrap",
+                        }}>
+                          {c.label}<SortIcon col={c.key} />
+                        </div>
+                      ))}
+                    </div>
+                    {sorted.map((r,i) => {
+                      const wp = (r.w/(r.gp||1)*100).toFixed(1);
+                      return (
+                        <div key={i} style={{
+                          display:"grid", gridTemplateColumns: isMobile ? "1fr 44px 44px 44px 44px 54px 54px 54px 54px" : "1fr 60px 60px 60px 60px 80px 80px 80px 80px",
+                          padding: isMobile ? "8px 10px" : "10px 16px", borderBottom:"1px solid rgba(255,255,255,0.04)",
+                          fontSize:13, alignItems:"center",
+                          background: i%2===0 ? "transparent" : "rgba(255,255,255,0.02)"
+                        }}>
+                          <span style={{display:"flex", alignItems:"center", gap:8}}>
+                            <TeamBadge team={r.opponent} size={24} />
+                            <button onClick={() => { setTab("history"); setVsTeam(r.opponent); }}
+                              style={{background:"none", border:"none", color:"#fff", cursor:"pointer", fontSize:13, fontWeight:500, textDecoration:"underline", padding:0}}>
+                              {r.opponent}
+                            </button>
+                          </span>
+                          <span>{r.gp}</span>
+                          <span style={{color:"#27ae60", fontWeight:600}}>{r.w}</span>
+                          <span style={{color:"#e74c3c", fontWeight:600}}>{r.l}</span>
+                          <span style={{color:"#f39c12", fontWeight:600}}>{r.d}</span>
+                          <span style={{color: parseFloat(wp) >= 50 ? "#27ae60" : "#e74c3c", fontWeight:700}}>{wp}%</span>
+                          <span>{r.gf}</span>
+                          <span>{r.ga}</span>
+                          <span style={{color: r.gd >= 0 ? "#27ae60" : "#e74c3c"}}>
+                            {r.gd >= 0 ? "+" : ""}{r.gd}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* SEASONS TAB */}
+        {tab === "seasons" && (
+          <div>
+            <div style={{background:"rgba(255,255,255,0.03)", borderRadius:12, overflow:"hidden"}}>
+              <div style={{overflowX: isMobile ? "auto" : "visible"}}>
+              <div style={{
+                display:"grid", gridTemplateColumns:"80px 60px 60px 60px 60px 60px 80px 80px 80px 80px 80px 1fr", minWidth: isMobile ? 800 : "unset",
+                padding:"10px 16px", background:"rgba(255,255,255,0.07)",
+                fontSize:12, color:"#888", textTransform:"uppercase", letterSpacing:2, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700
+              }}>
+                <span>Season</span><span>Year</span><span>GP</span><span style={{color:"#27ae60"}}>W</span>
+                <span style={{color:"#e74c3c"}}>L</span><span style={{color:"#f39c12"}}>D</span>
+                <span>Win%</span><span>Pts</span><span>GF</span><span>GA</span><span>GD</span>
+                <span>Silverware</span>
+              </div>
+              {seasonalData.map((r,i) => {
+                const wp = (r.w/(r.gp||1)*100).toFixed(1);
+                const isCupWinner = MLS_CUP_WINNERS[r.season] === selectedTeam;
+                const isShieldWinner = SUPPORTERS_SHIELD_WINNERS[r.season] === selectedTeam;
+                return (
+                  <div key={i} style={{
+                    display:"grid", gridTemplateColumns:"80px 60px 60px 60px 60px 60px 80px 80px 80px 80px 80px 1fr",
+                    padding:"10px 16px", borderBottom:"1px solid rgba(255,255,255,0.04)",
+                    fontSize:13, alignItems:"center",
+                    background: i%2===0 ? "transparent" : "rgba(255,255,255,0.02)"
+                  }}>
+                    <span style={{fontWeight:700}}>{r.season}</span>
+                    <span style={{color:"#aaa"}}>{r.season + 1995}</span>
+                    <span>{r.gp}</span>
+                    <span style={{color:"#27ae60", fontWeight:600}}>{r.w}</span>
+                    <span style={{color:"#e74c3c", fontWeight:600}}>{r.l}</span>
+                    <span style={{color:"#f39c12", fontWeight:600}}>{r.d}</span>
+                    <span style={{
+                      color: parseFloat(wp) >= 50 ? "#27ae60" : "#e74c3c",
+                      fontWeight:700
+                    }}>{wp}%</span>
+                    <span style={{fontWeight:700}}>{r.pts}</span>
+                    <span>{r.gf}</span>
+                    <span>{r.ga}</span>
+                    <span style={{color: r.gd >= 0 ? "#27ae60" : "#e74c3c"}}>
+                      {r.gd >= 0 ? "+" : ""}{r.gd}
+                    </span>
+                    <span style={{display:"flex", flexWrap:"wrap", gap:4}}>
+                      {isCupWinner && (
+                        <span title="MLS Cup Champion" style={{fontSize:10, fontWeight:700, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:0.5, background:"rgba(200,16,46,0.25)", color:"#ff8a9a", border:"1px solid rgba(200,16,46,0.4)", borderRadius:4, padding:"2px 6px", whiteSpace:"nowrap"}}>🏆 MLS Cup</span>
+                      )}
+                      {isShieldWinner && (
+                        <span title="Supporters Shield Winner" style={{fontSize:10, fontWeight:700, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:0.5, background:"rgba(236,232,58,0.15)", color:"#ECE83A", border:"1px solid rgba(236,232,58,0.3)", borderRadius:4, padding:"2px 6px", whiteSpace:"nowrap"}}>🛡 Shield</span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            </div>
+          </div>
+        )}
+      </div>
+      )} {/* end team view content */}
+
+      {/* Score Entry Modal */}
+      {scoreEntry && (
+        <div style={{position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300}}
+          onClick={e => { if(e.target===e.currentTarget){ setScoreEntry(null); setScoreInput({hg:"",ag:""}); } }}>
+          <div style={{background:"#111827", borderRadius:16, padding:28, width:340, border:"1px solid rgba(255,255,255,0.1)"}}>
+            <div style={{fontSize:11, color:"#888", textTransform:"uppercase", letterSpacing:3, marginBottom:16, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700}}>Enter Result</div>
+            {/* Match display */}
+            <div style={{marginBottom:20}}>
+              {[scoreEntry.match[1], scoreEntry.match[2]].map((team, ti) => (
+                <div key={ti} style={{display:"flex", alignItems:"center", gap:10, marginBottom: ti===0 ? 8 : 0}}>
+                  <TeamBadge team={team} size={32} />
+                  <span style={{flex:1, fontSize:15, fontWeight:700, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:0.5}}>{team}</span>
+                  <input
+                    type="number" min="0" max="20"
+                    value={ti===0 ? scoreInput.hg : scoreInput.ag}
+                    onChange={e => setScoreInput(s => ti===0 ? {...s, hg:e.target.value} : {...s, ag:e.target.value})}
+                    style={{width:52, background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.25)", borderRadius:8, padding:"8px", fontSize:20, fontWeight:800, textAlign:"center", fontFamily:"'Barlow Condensed', sans-serif"}}
+                    autoFocus={ti===0}
+                  />
+                </div>
+              ))}
+            </div>
+            <div style={{fontSize:11, color:"#555", textAlign:"center", marginBottom:16, fontFamily:"'Barlow', sans-serif"}}>
+              {new Date(scoreEntry.match[0]+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}
+            </div>
+            <div style={{display:"flex", gap:8}}>
+              <button onClick={saveScore} disabled={scoreInput.hg===""||scoreInput.ag===""}
+                style={{flex:1, background: scoreInput.hg!==""&&scoreInput.ag!=="" ? "#C8102E" : "rgba(255,255,255,0.05)", color: scoreInput.hg!==""&&scoreInput.ag!=="" ? "#fff" : "#444", border:"none", borderRadius:8, padding:"11px", cursor: scoreInput.hg!==""&&scoreInput.ag!=="" ? "pointer" : "default", fontWeight:800, fontSize:14, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}>
+                Save Result
+              </button>
+              <button onClick={() => { setScoreEntry(null); setScoreInput({hg:"",ag:""}); }}
+                style={{flex:1, background:"rgba(255,255,255,0.07)", color:"#aaa", border:"none", borderRadius:8, padding:"11px", cursor:"pointer", fontSize:14, fontFamily:"'Barlow Condensed', sans-serif"}}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Match Modal */}
+      {showAddMatch && (
+        <div style={{
+          position:"fixed", inset:0, background:"rgba(0,0,0,0.8)",
+          display:"flex", alignItems:"center", justifyContent:"center", zIndex:200
+        }}>
+          <div style={{
+            background:"#1a1a2e", borderRadius:16, padding: isMobile ? 20 : 32, width: isMobile ? "94vw" : 440,
+            border:"1px solid rgba(255,255,255,0.1)"
+          }}>
+            <h2 style={{margin:"0 0 20px", fontSize:24, fontFamily:"'Barlow Condensed', sans-serif", letterSpacing:1, fontWeight:800, textTransform:"uppercase"}}>{editingMatch ? "Edit Match" : "Add New Match"}</h2>
+            <div style={{display:"flex", flexDirection:"column", gap:12}}>
+              {[
+                {label:"Date", key:"date", type:"date"},
+                {label:"Season #", key:"seasonId", type:"number"},
+              ].map(({label, key, type}) => (
+                <div key={key}>
+                  <label style={{fontSize:12, color:"#888", display:"block", marginBottom:4}}>{label}</label>
+                  <input type={type} value={newMatch[key]}
+                    onChange={e => setNewMatch({...newMatch, [key]: e.target.value})}
+                    style={{width:"100%", background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"8px 12px", fontSize:14, boxSizing:"border-box"}}
+                  />
+                </div>
+              ))}
+              {["home","away"].map(side => (
+                <div key={side}>
+                  <label style={{fontSize:12, color:"#888", display:"block", marginBottom:4}}>{side === "home" ? "Home Team" : "Away Team"}</label>
+                  <select value={newMatch[side]} onChange={e => setNewMatch({...newMatch, [side]: e.target.value})}
+                    style={{width:"100%", background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"8px 12px", fontSize:14}}>
+                    <option value="" style={{background:"#1a1a2e"}}>Select team...</option>
+                    {ALL_TEAMS.map(t => <option key={t} value={t} style={{background:"#1a1a2e"}}>{t}</option>)}
+                  </select>
+                </div>
+              ))}
+              <div style={{display:"flex", gap:12}}>
+                {[{label:"Home Goals", key:"homeGoals"},{label:"Away Goals", key:"awayGoals"}].map(({label, key}) => (
+                  <div key={key} style={{flex:1}}>
+                    <label style={{fontSize:12, color:"#888", display:"block", marginBottom:4}}>{label}</label>
+                    <input type="number" min="0" value={newMatch[key]}
+                      onChange={e => setNewMatch({...newMatch, [key]: e.target.value})}
+                      style={{width:"100%", background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"8px 12px", fontSize:14, boxSizing:"border-box"}}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div>
+                <label style={{fontSize:12, color:"#888", display:"block", marginBottom:4}}>Match Type</label>
+                <select value={newMatch.matchType} onChange={e => setNewMatch({...newMatch, matchType: e.target.value})}
+                  style={{width:"100%", background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"8px 12px", fontSize:14}}>
+                  {MATCH_TYPES.map(t => <option key={t} value={t} style={{background:"#1a1a2e"}}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{display:"flex", gap:10, marginTop:24}}>
+              <button onClick={addMatch}
+                style={{flex:1, background:MLS_RED, color:"#fff", border:"none", borderRadius:8, padding:"12px", cursor:"pointer", fontWeight:700, fontSize:15}}>
+                {editingMatch ? "Save Changes" : "Save Match"}
+              </button>
+              <button onClick={() => { setShowAddMatch(false); setEditingMatch(null); }}
+                style={{flex:1, background:"rgba(255,255,255,0.1)", color:"#fff", border:"none", borderRadius:8, padding:"12px", cursor:"pointer", fontSize:15}}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Admin Login Modal */}
+      {showAdminLogin && (
+        <div style={{position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300}}>
+          <div style={{background:"#1a1a2e", borderRadius:16, padding: isMobile ? 20 : 32, width: isMobile ? "92vw" : 360, border:"1px solid rgba(255,255,255,0.12)"}}>
+            <h2 style={{margin:"0 0 8px", fontSize:22, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:800, textTransform:"uppercase", letterSpacing:1}}>Admin Mode</h2>
+            <p style={{margin:"0 0 20px", fontSize:13, color:"#888"}}>Enter the admin password to enable editing features.</p>
+            <input
+              type="password"
+              placeholder="Password"
+              value={adminPassword}
+              onChange={e => setAdminPassword(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && submitAdminLogin()}
+              autoFocus
+              style={{width:"100%", background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"10px 14px", fontSize:15, boxSizing:"border-box", marginBottom:16, outline:"none"}}
+            />
+            <div style={{display:"flex", gap:10}}>
+              <button onClick={submitAdminLogin}
+                style={{flex:1, background:MLS_RED, color:"#fff", border:"none", borderRadius:8, padding:"11px", cursor:"pointer", fontWeight:700, fontSize:14, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}>
+                Unlock
+              </button>
+              <button onClick={() => { setShowAdminLogin(false); setAdminPassword(""); }}
+                style={{flex:1, background:"rgba(255,255,255,0.08)", color:"#fff", border:"none", borderRadius:8, padding:"11px", cursor:"pointer", fontSize:14}}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generate Historical Data Dialog */}
+      {showDataDialog && (
+        <div style={{position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300}}>
+          <div style={{background:"#1a1a2e", borderRadius:16, padding:28, width:"min(860px, 95vw)", maxHeight:"85vh", display:"flex", flexDirection:"column", border:"1px solid rgba(255,255,255,0.12)"}}>
+            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12}}>
+              <div>
+                <h2 style={{margin:0, fontSize:20, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:800, textTransform:"uppercase", letterSpacing:1}}>Updated HISTORICAL_DATA</h2>
+                <p style={{margin:"4px 0 0", fontSize:12, color:"#888"}}>
+                  Copy everything below and replace the <code style={{background:"rgba(255,255,255,0.08)", padding:"1px 5px", borderRadius:3}}>const HISTORICAL_DATA = [...];</code> block in your code.
+                </p>
+              </div>
+              <button onClick={() => setShowDataDialog(false)}
+                style={{background:"rgba(255,255,255,0.08)", border:"none", color:"#aaa", borderRadius:8, padding:"6px 14px", cursor:"pointer", fontSize:13, marginLeft:16}}>
+                ✕ Close
+              </button>
+            </div>
+            <div style={{display:"flex", gap:8, marginBottom:10}}>
+              <button
+                onClick={() => {
+                  const ta = document.getElementById("hist-data-textarea");
+                  if (ta) {
+                    ta.focus();
+                    ta.select();
+                    try {
+                      document.execCommand("copy");
+                      setNotification("Copied to clipboard!");
+                    } catch(e) {
+                      setNotification("Text selected — press Ctrl+C (or Cmd+C) to copy.");
+                    }
+                    setTimeout(() => setNotification(""), 4000);
+                  }
+                }}
+                style={{background:MLS_RED, color:"#fff", border:"none", borderRadius:8, padding:"8px 18px", cursor:"pointer", fontWeight:700, fontSize:13, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}>
+                📋 Copy to Clipboard
+              </button>
+              <span style={{fontSize:12, color:"#555", alignSelf:"center"}}>
+                {generatedData.split("\n").length.toLocaleString()} lines · {(generatedData.length / 1024).toFixed(0)}KB
+              </span>
+            </div>
+            <textarea
+              id="hist-data-textarea"
+              readOnly
+              value={generatedData}
+              style={{flex:1, background:"rgba(0,0,0,0.4)", color:"#a8d8a8", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:12, fontSize:11, fontFamily:"'Courier New', monospace", resize:"none", outline:"none", lineHeight:1.4}}
+            />
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
