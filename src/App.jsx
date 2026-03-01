@@ -502,15 +502,19 @@ export default function App() {
       const added = localStorage.getItem("mls_added_matches");
       const locked = localStorage.getItem("mls_locked_scores");
       const lockedMap = locked ? JSON.parse(locked) : {};
-      const base = added ? [...HISTORICAL_DATA, ...JSON.parse(added)] : [...HISTORICAL_DATA];
-      if (Object.keys(lockedMap).length > 0) {
-        setMatches(base.map(m => {
-          const s = lockedMap[`${m[0]}|${m[1]}|${m[2]}`];
-          return s ? [m[0], m[1], m[2], s[0], s[1], m[5], m[6]] : m;
-        }));
-      } else {
-        if (added) setMatches(base);
-      }
+      const addedMatches = added ? JSON.parse(added) : [];
+      // Apply added matches and locked scores on top of current matches state
+      // (which is either HISTORICAL_DATA inline or will be replaced by fetch)
+      setMatches(prev => {
+        let base = addedMatches.length > 0 ? [...prev, ...addedMatches] : [...prev];
+        if (Object.keys(lockedMap).length > 0) {
+          base = base.map(m => {
+            const s = lockedMap[`${m[0]}|${m[1]}|${m[2]}`];
+            return s ? [m[0], m[1], m[2], s[0], s[1], m[5], m[6]] : m;
+          });
+        }
+        return base;
+      });
     } catch(e) {}
     try {
       const scores = localStorage.getItem("mls_entered_scores");
@@ -736,16 +740,6 @@ export default function App() {
 
   const getScore = (m) => enteredScores[scoreKey(m)] || null;
 
-  function exportScores() {
-    const data = JSON.stringify(enteredScores, null, 2);
-    const blob = new Blob([data], {type: "application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "mls_scores.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 
   function submitAdminLogin() {
     if (adminPassword === "fsfsicko") {
@@ -832,25 +826,6 @@ ${rows}
     setTimeout(() => setNotification(""), 5000);
   }
 
-  function importScores(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.target.result);
-        setEnteredScores(parsed);
-        localStorage.setItem("mls_entered_scores", JSON.stringify(parsed));
-        setNotification("Scores imported successfully!");
-        setTimeout(() => setNotification(""), 3000);
-      } catch(err) {
-        setNotification("Import failed — invalid file.");
-        setTimeout(() => setNotification(""), 3000);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = ""; // reset so same file can be re-imported
-  }
 
 
   function openAddMatch() {
@@ -906,8 +881,18 @@ ${rows}
 
     setMatches(newMatches);
     try {
-      const added = newMatches.slice(HISTORICAL_DATA.length);
-      localStorage.setItem("mls_added_matches", JSON.stringify(added));
+      // Persist only the newly added match, not the full array slice
+      const existing = localStorage.getItem("mls_added_matches");
+      const addedSoFar = existing ? JSON.parse(existing) : [];
+      if (!editingMatch) {
+        localStorage.setItem("mls_added_matches", JSON.stringify([...addedSoFar, m]));
+      } else {
+        // Update the edited match in the stored list if it was a previously added match
+        const updated = addedSoFar.map(a =>
+          `${a[0]}|${a[1]}|${a[2]}` === `${editingMatch[0]}|${editingMatch[1]}|${editingMatch[2]}` ? m : a
+        );
+        localStorage.setItem("mls_added_matches", JSON.stringify(updated));
+      }
     } catch(e) {}
     setShowAddMatch(false);
     setEditingMatch(null);
@@ -1007,21 +992,12 @@ ${rows}
                   {seasons.slice().reverse().map(s => <option key={s} value={s} style={{background:"#1a1a2e"}}>Season {s} — {s + 1995}</option>)}
                 </select>
                 {isAdmin && (<>
-                <button onClick={exportScores}
-                  style={{background:"rgba(255,255,255,0.08)", color:"#aaa", border:"1px solid rgba(255,255,255,0.15)", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:700, fontSize:12, whiteSpace:"nowrap", fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}
-                  title="Export entered scores to a JSON file">
-                  ↓ Export
-                </button>
+                
                 <button onClick={() => openAddMatch()}
                   style={{background:"rgba(255,255,255,0.12)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:700, fontSize:12, whiteSpace:"nowrap", fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}>
                   + Add Match
                 </button>
-                <label
-                  style={{background:"rgba(255,255,255,0.08)", color:"#aaa", border:"1px solid rgba(255,255,255,0.15)", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:700, fontSize:12, whiteSpace:"nowrap", fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}
-                  title="Import scores from a previously exported JSON file">
-                  ↑ Import
-                  <input type="file" accept=".json" onChange={importScores} style={{display:"none"}} />
-                </label>
+                
                 <button onClick={generateHistoricalData}
                   style={{background:"rgba(200,16,46,0.2)", color:"#ff8a9a", border:"1px solid rgba(200,16,46,0.4)", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:700, fontSize:12, whiteSpace:"nowrap", fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}
                   title="Generate updated HISTORICAL_DATA to copy into your code">
