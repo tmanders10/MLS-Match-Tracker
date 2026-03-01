@@ -1335,7 +1335,7 @@ ${rows}
                   <span style={{fontSize:14, fontWeight:800, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:2, color:"#fff"}}>{title}</span>
                 </div>
                 {/* Header row */}
-                <div style={{display:"grid", gridTemplateColumns: isMobile ? "20px 28px 36px 36px 36px 36px 42px 42px 42px 50px" + (showForm ? " 1fr" : "") : "32px 1fr 44px 44px 44px 44px 52px 52px 52px 60px" + (showForm ? " 164px" : ""), padding: isMobile ? "6px 8px" : "8px 14px", background:"rgba(255,255,255,0.06)", fontSize: isMobile ? 10 : 11, color:"#666", textTransform:"uppercase", letterSpacing:2, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700}}>
+                <div style={{display:"grid", gridTemplateColumns: isMobile ? "18px 1fr 30px 30px 30px 30px 36px 36px 36px 44px" : "32px 1fr 44px 44px 44px 44px 52px 52px 52px 60px" + (showForm && !isMobile ? " 164px" : ""), padding: isMobile ? "6px 8px" : "8px 14px", background:"rgba(255,255,255,0.06)", fontSize: isMobile ? 10 : 11, color:"#666", textTransform:"uppercase", letterSpacing:2, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700}}>
                   <span>#</span><span>Club</span>
                   <span style={{textAlign:"center"}}>GP</span>
                   <span style={{textAlign:"center", color:"#27ae60"}}>W</span>
@@ -1345,7 +1345,7 @@ ${rows}
                   <span style={{textAlign:"center"}}>GA</span>
                   <span style={{textAlign:"center"}}>GD</span>
                   <span style={{textAlign:"center", color:"#fff"}}>PTS</span>
-                  {showForm && <span style={{textAlign:"center", color:"#aaa", letterSpacing:1}}>FORM</span>}
+                  {showForm && !isMobile && <span style={{textAlign:"center", color:"#aaa", letterSpacing:1}}>FORM</span>}
                 </div>
                 {/* Data rows — fixed height for consistency */}
                 <div style={{flex:1, display:"flex", flexDirection:"column"}}>
@@ -1353,7 +1353,7 @@ ${rows}
                     const gd = r.gf - r.ga;
                     return (
                       <div key={i} onClick={() => { setView("team"); setSelectedTeam(r.team); setTab("dashboard"); }}
-                        style={{display:"grid", gridTemplateColumns: isMobile ? "20px 28px 36px 36px 36px 36px 42px 42px 42px 50px" + (showForm ? " 1fr" : "") : "32px 1fr 44px 44px 44px 44px 52px 52px 52px 60px" + (showForm ? " 164px" : ""), padding: isMobile ? "0 8px" : "0 14px", height:48, minHeight:48, maxHeight:48, borderBottom:"1px solid rgba(255,255,255,0.04)", fontSize:13, alignItems:"center", flex:"0 0 48px", background: i%2===0 ? "transparent" : "rgba(255,255,255,0.02)", cursor:"pointer", transition:"background 0.15s", overflow:"hidden"}}
+                        style={{display:"grid", gridTemplateColumns: isMobile ? "18px 1fr 30px 30px 30px 30px 36px 36px 36px 44px" : "32px 1fr 44px 44px 44px 44px 52px 52px 52px 60px" + (showForm && !isMobile ? " 164px" : ""), padding: isMobile ? "0 8px" : "0 14px", height:48, minHeight:48, maxHeight:48, borderBottom:"1px solid rgba(255,255,255,0.04)", fontSize:13, alignItems:"center", flex:"0 0 48px", background: i%2===0 ? "transparent" : "rgba(255,255,255,0.02)", cursor:"pointer", transition:"background 0.15s", overflow:"hidden"}}
                         onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.07)"}
                         onMouseLeave={e => e.currentTarget.style.background= i%2===0 ? "transparent" : "rgba(255,255,255,0.02)"}
                       >
@@ -1370,7 +1370,7 @@ ${rows}
                         <span style={{textAlign:"center"}}>{r.ga}</span>
                         <span style={{textAlign:"center", color: gd > 0 ? "#27ae60" : gd < 0 ? "#e74c3c" : "#aaa"}}>{gd > 0 ? `+${gd}` : gd}</span>
                         <span style={{textAlign:"center", fontWeight:800, fontSize:15, fontFamily:"'Barlow Condensed', sans-serif", color:"#fff"}}>{r.pts}</span>
-                        {showForm && (() => {
+                        {showForm && !isMobile && (() => {
                           const form = formData ? (formData[r.team] || []) : [];
                           const boxes = [];
                           for (let fi = 0; fi < 10; fi++) {
