@@ -472,7 +472,7 @@ export default function App() {
   const [filterTypes, setFilterTypes] = useState(new Set());
   const [filterSeasons, setFilterSeasons] = useState(new Set());
   const [filterOpenPanel, setFilterOpenPanel] = useState(null); // "opponent"|"type"|"season"|null
-  const [standingsTab, setStandingsTab] = useState("conference"); // "conference"|"shield"
+  const [standingsTab, setStandingsTab] = useState("eastern"); // "eastern"|"western"|"shield"
   const [dashboardSeason, setDashboardSeason] = useState(null);
   const [h2hSort, setH2hSort] = useState({col:"gp", dir:"desc"}); // null = auto (latest played season)
   const [showAddMatch, setShowAddMatch] = useState(false);
@@ -1327,7 +1327,7 @@ ${rows}
           {standingsData.length === 0 ? (
             <div style={{color:"#555", fontSize:14, textAlign:"center", padding:"40px 0"}}>No matches played yet for this season.</div>
           ) : (() => {
-            const StandingsTable = ({rows, title, color}) => (
+            const StandingsTable = ({rows, title, color, showForm, formData}) => (
               <div style={{background:"rgba(255,255,255,0.03)", borderRadius:12, overflow:"hidden", display:"flex", flexDirection:"column"}}>
                 {/* Table title */}
                 <div style={{background:`linear-gradient(90deg, ${color}33 0%, transparent 100%)`, borderBottom:`2px solid ${color}66`, padding:"12px 16px", display:"flex", alignItems:"center", gap:10}}>
@@ -1335,7 +1335,7 @@ ${rows}
                   <span style={{fontSize:14, fontWeight:800, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:2, color:"#fff"}}>{title}</span>
                 </div>
                 {/* Header row */}
-                <div style={{display:"grid", gridTemplateColumns: isMobile ? "20px 28px 36px 36px 36px 36px 42px 42px 42px 50px" : "32px 1fr 44px 44px 44px 44px 52px 52px 52px 60px", padding: isMobile ? "6px 8px" : "8px 14px", background:"rgba(255,255,255,0.06)", fontSize: isMobile ? 10 : 11, color:"#666", textTransform:"uppercase", letterSpacing:2, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700}}>
+                <div style={{display:"grid", gridTemplateColumns: isMobile ? "20px 28px 36px 36px 36px 36px 42px 42px 42px 50px" + (showForm ? " 1fr" : "") : "32px 1fr 44px 44px 44px 44px 52px 52px 52px 60px" + (showForm ? " 164px" : ""), padding: isMobile ? "6px 8px" : "8px 14px", background:"rgba(255,255,255,0.06)", fontSize: isMobile ? 10 : 11, color:"#666", textTransform:"uppercase", letterSpacing:2, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700}}>
                   <span>#</span><span>Club</span>
                   <span style={{textAlign:"center"}}>GP</span>
                   <span style={{textAlign:"center", color:"#27ae60"}}>W</span>
@@ -1345,6 +1345,7 @@ ${rows}
                   <span style={{textAlign:"center"}}>GA</span>
                   <span style={{textAlign:"center"}}>GD</span>
                   <span style={{textAlign:"center", color:"#fff"}}>PTS</span>
+                  {showForm && <span style={{textAlign:"center", color:"#aaa", letterSpacing:1}}>FORM</span>}
                 </div>
                 {/* Data rows — fixed height for consistency */}
                 <div style={{flex:1, display:"flex", flexDirection:"column"}}>
@@ -1352,7 +1353,7 @@ ${rows}
                     const gd = r.gf - r.ga;
                     return (
                       <div key={i} onClick={() => { setView("team"); setSelectedTeam(r.team); setTab("dashboard"); }}
-                        style={{display:"grid", gridTemplateColumns: isMobile ? "20px 28px 36px 36px 36px 36px 42px 42px 42px 50px" : "32px 1fr 44px 44px 44px 44px 52px 52px 52px 60px", padding: isMobile ? "0 8px" : "0 14px", height:48, minHeight:48, maxHeight:48, borderBottom:"1px solid rgba(255,255,255,0.04)", fontSize:13, alignItems:"center", flex:"0 0 48px", background: i%2===0 ? "transparent" : "rgba(255,255,255,0.02)", cursor:"pointer", transition:"background 0.15s", overflow:"hidden"}}
+                        style={{display:"grid", gridTemplateColumns: isMobile ? "20px 28px 36px 36px 36px 36px 42px 42px 42px 50px" + (showForm ? " 1fr" : "") : "32px 1fr 44px 44px 44px 44px 52px 52px 52px 60px" + (showForm ? " 164px" : ""), padding: isMobile ? "0 8px" : "0 14px", height:48, minHeight:48, maxHeight:48, borderBottom:"1px solid rgba(255,255,255,0.04)", fontSize:13, alignItems:"center", flex:"0 0 48px", background: i%2===0 ? "transparent" : "rgba(255,255,255,0.02)", cursor:"pointer", transition:"background 0.15s", overflow:"hidden"}}
                         onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.07)"}
                         onMouseLeave={e => e.currentTarget.style.background= i%2===0 ? "transparent" : "rgba(255,255,255,0.02)"}
                       >
@@ -1369,6 +1370,27 @@ ${rows}
                         <span style={{textAlign:"center"}}>{r.ga}</span>
                         <span style={{textAlign:"center", color: gd > 0 ? "#27ae60" : gd < 0 ? "#e74c3c" : "#aaa"}}>{gd > 0 ? `+${gd}` : gd}</span>
                         <span style={{textAlign:"center", fontWeight:800, fontSize:15, fontFamily:"'Barlow Condensed', sans-serif", color:"#fff"}}>{r.pts}</span>
+                        {showForm && (() => {
+                          const form = formData ? (formData[r.team] || []) : [];
+                          const boxes = [];
+                          for (let fi = 0; fi < 10; fi++) {
+                            const result = form[fi];
+                            const isPlayed = result !== undefined;
+                            const bg = !isPlayed ? "rgba(255,255,255,0.06)"
+                              : result === "W" ? "#27ae60"
+                              : result === "L" ? "#e74c3c"
+                              : "#f39c12";
+                            boxes.push(
+                              <div key={fi} style={{
+                                width:14, height:14, borderRadius:3,
+                                background: bg,
+                                flexShrink:0,
+                                opacity: isPlayed ? 1 : 0.3,
+                              }} />
+                            );
+                          }
+                          return <div style={{display:"flex", gap:2, alignItems:"center", justifyContent:"center"}}>{boxes}</div>;
+                        })()}
                       </div>
                     );
                   })}
@@ -1380,7 +1402,7 @@ ${rows}
               <>
                 {/* Tab bar */}
                 <div style={{display:"flex", gap:4, marginBottom:20, borderBottom:"1px solid rgba(255,255,255,0.08)", paddingBottom:0}}>
-                  {[["conference","Conference"],["shield","Supporter's Shield"]].map(([key, label]) => (
+                  {[["eastern","Eastern"],["western","Western"],["shield","Supporter's Shield"]].map(([key, label]) => (
                     <button key={key} onClick={() => setStandingsTab(key)} style={{
                       background:"none", border:"none", cursor:"pointer",
                       padding:"8px 18px", fontSize:13, fontWeight:700,
@@ -1393,20 +1415,63 @@ ${rows}
                   ))}
                 </div>
 
-                {/* Conference tab */}
-                {standingsTab === "conference" && (
-                  <div style={{display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:20, alignItems:"stretch"}}>
-                    <StandingsTable rows={eastStandings} title="Eastern Conference" color="#C8102E" />
-                    <StandingsTable rows={westStandings} title="Western Conference" color="#69B3E7" />
-                  </div>
-                )}
+                {/* Eastern Conference tab */}
+                {(standingsTab === "eastern" || standingsTab === "western") && (() => {
+                  const seasonPlayed = effectiveMatches.filter(m => m[6] === standingsSeason && m[3] >= 0);
+                  const buildFormData = (rows) => {
+                    const fd = {};
+                    rows.forEach(r => {
+                      const tm = seasonPlayed
+                        .filter(m => m[1] === r.team || m[2] === r.team)
+                        .sort((a, b) => a[0].localeCompare(b[0]));
+                      const last10 = tm.slice(-10);
+                      fd[r.team] = last10.map(m => {
+                        const isHome = m[1] === r.team;
+                        const gf = isHome ? m[3] : m[4];
+                        const ga = isHome ? m[4] : m[3];
+                        return gf > ga ? "W" : gf < ga ? "L" : "D";
+                      });
+                      while (fd[r.team].length < 10) fd[r.team].push(undefined);
+                    });
+                    return fd;
+                  };
+                  const rows = standingsTab === "eastern" ? eastStandings : westStandings;
+                  const title = standingsTab === "eastern" ? "Eastern Conference" : "Western Conference";
+                  const color = standingsTab === "eastern" ? "#C8102E" : "#69B3E7";
+                  return (
+                    <div>
+                      <StandingsTable rows={rows} title={title} color={color} showForm={true} formData={buildFormData(rows)} />
+                    </div>
+                  );
+                })()}
 
                 {/* Supporter's Shield tab */}
-                {standingsTab === "shield" && (
-                  <div>
-                    <StandingsTable rows={standingsData} title="Supporter's Shield Standings" color="#ECE83A" />
-                  </div>
-                )}
+                {standingsTab === "shield" && (() => {
+                  // Compute last 10 played matches per team for selected season (all match types)
+                  const seasonPlayed = effectiveMatches.filter(m => m[6] === standingsSeason && m[3] >= 0);
+                  const formData = {};
+                  standingsData.forEach(r => {
+                    const teamMatches = seasonPlayed
+                      .filter(m => m[1] === r.team || m[2] === r.team)
+                      .sort((a, b) => a[0].localeCompare(b[0])); // oldest first
+                    const last10 = teamMatches.slice(-10);
+                    formData[r.team] = last10.map(m => {
+                      const isHome = m[1] === r.team;
+                      const gf = isHome ? m[3] : m[4];
+                      const ga = isHome ? m[4] : m[3];
+                      return gf > ga ? "W" : gf < ga ? "L" : "D";
+                    });
+                    // Pad to 10 from the front if fewer than 10 played
+                    while (formData[r.team].length < 10) {
+                      formData[r.team].push(undefined);
+                    }
+                  });
+                  return (
+                    <div>
+                      <StandingsTable rows={standingsData} title="Supporter's Shield Standings" color="#ECE83A" showForm={true} formData={formData} />
+                    </div>
+                  );
+                })()}
               </>
             );
           })()}
