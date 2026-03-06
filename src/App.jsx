@@ -849,14 +849,18 @@ ${rows}
   }
 
   function addMatch() {
-    if (!newMatch.home || !newMatch.away || newMatch.homeGoals === "" || newMatch.awayGoals === "") {
-      setNotification("Please fill all required fields"); 
+    // Scores are always optional (match may not be played yet)
+    // But if one score is entered, both must be entered
+    const oneScoreEntered = (newMatch.homeGoals !== "") !== (newMatch.awayGoals !== "");
+    if (!newMatch.home || !newMatch.away || oneScoreEntered) {
+      setNotification(oneScoreEntered ? "Please enter both scores or neither" : "Please fill all required fields");
       setTimeout(() => setNotification(""), 3000);
       return;
     }
     const m = [
       newMatch.date, newMatch.home, newMatch.away,
-      parseInt(newMatch.homeGoals), parseInt(newMatch.awayGoals),
+      newMatch.homeGoals === "" ? -1 : parseInt(newMatch.homeGoals),
+      newMatch.awayGoals === "" ? -1 : parseInt(newMatch.awayGoals),
       newMatch.matchType, parseInt(newMatch.seasonId)
     ];
 
