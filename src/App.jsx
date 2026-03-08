@@ -600,18 +600,35 @@ export default function App() {
     const table = {};
     seasonMatches.forEach(m => {
       const home = m[1], away = m[2], hg = m[3], ag = m[4];
-      if (!table[home]) table[home] = {team:home,gp:0,w:0,d:0,l:0,gf:0,ga:0,pts:0};
-      if (!table[away]) table[away] = {team:away,gp:0,w:0,d:0,l:0,gf:0,ga:0,pts:0};
+      if (!table[home]) table[home] = {team:home,gp:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,awayGf:0};
+      if (!table[away]) table[away] = {team:away,gp:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,awayGf:0};
       table[home].gp++; table[away].gp++;
       table[home].gf += hg; table[home].ga += ag;
       table[away].gf += ag; table[away].ga += hg;
+      table[away].awayGf += ag; // away team's goals scored in this away match
       if (hg > ag) { table[home].w++; table[home].pts+=3; table[away].l++; }
       else if (hg < ag) { table[away].w++; table[away].pts+=3; table[home].l++; }
       else { table[home].d++; table[home].pts++; table[away].d++; table[away].pts++; }
     });
-    return Object.values(table).sort((a,b) =>
-      b.pts-a.pts || b.w-a.w || b.gf-a.gf || a.ga-b.ga
-    );
+    return Object.values(table).sort((a,b) => {
+      // Official MLS tiebreaker order:
+      // 1. Points
+      // 2. Points per game
+      // 3. Wins
+      // 4. Goal differential
+      // 5. Goals for
+      // 6. Away goals
+      const aPpg = a.gp > 0 ? a.pts / a.gp : 0;
+      const bPpg = b.gp > 0 ? b.pts / b.gp : 0;
+      const aGd = a.gf - a.ga;
+      const bGd = b.gf - b.ga;
+      return (b.pts - a.pts)
+          || (bPpg - aPpg)
+          || (b.w - a.w)
+          || (bGd - aGd)
+          || (b.gf - a.gf)
+          || (b.awayGf - a.awayGf);
+    });
   };
 
   const standingsData = useMemo(() => computeStandings(standingsSeason),
