@@ -439,6 +439,17 @@ export default function App() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // Set favicon from embedded MLS logo
+  useEffect(() => {
+    try {
+      const link = document.querySelector("link[rel~='icon']") || document.createElement("link");
+      link.rel = "icon";
+      link.href = MLS_LOGO;
+      document.head.appendChild(link);
+      document.title = "MLS Match Tracker";
+    } catch(e) {}
+  }, []);
+
   // If running outside Claude.ai, fetch full dataset from /data.json
   useEffect(() => {
     if (!dataLoading) return;
