@@ -485,6 +485,9 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showDataDialog, setShowDataDialog] = useState(false);
   const [generatedData, setGeneratedData] = useState("");
+  const [ghToken, setGhToken] = useState(() => { try { return localStorage.getItem("mls_gh_token") || ""; } catch { return ""; } });
+  const [ghRepo, setGhRepo] = useState(() => { try { return localStorage.getItem("mls_gh_repo") || ""; } catch { return ""; } });
+  const [ghPushStatus, setGhPushStatus] = useState(""); // "pushing"|"success"|"error"|""
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [view, setView] = useState("league"); // "team" | "league" | "standings"
@@ -793,6 +796,47 @@ ${rows}
 ]`;
     setGeneratedData(output);
     setShowDataDialog(true);
+  }
+
+  async function pushToGitHub(jsonData) {
+    if (!ghToken || !ghRepo) {
+      setGhPushStatus("error:Please set your GitHub token and repo below.");
+      return;
+    }
+    setGhPushStatus("pushing");
+    try {
+      const path = "public/data.json";
+      const apiBase = `https://api.github.com/repos/${ghRepo}/contents/${path}`;
+      const headers = {
+        Authorization: `token ${ghToken}`,
+        "Content-Type": "application/json",
+        "User-Agent": "mls-tracker",
+      };
+      // Step 1: Get current SHA
+      const shaRes = await fetch(apiBase, { headers });
+      if (!shaRes.ok) throw new Error(`Could not read file: ${shaRes.status} ${shaRes.statusText}`);
+      const shaData = await shaRes.json();
+      const sha = shaData.sha;
+      // Step 2: Encode and push
+      const encoded = btoa(unescape(encodeURIComponent(jsonData)));
+      const pushRes = await fetch(apiBase, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          message: `data: update match scores ${new Date().toISOString().slice(0,10)}`,
+          content: encoded,
+          sha,
+        }),
+      });
+      if (!pushRes.ok) {
+        const err = await pushRes.json();
+        throw new Error(err.message || pushRes.statusText);
+      }
+      setGhPushStatus("success");
+      setTimeout(() => setGhPushStatus(""), 5000);
+    } catch(e) {
+      setGhPushStatus(`error:${e.message}`);
+    }
   }
   function lockMatchweek() {
     if (!currentDay) return;
@@ -2142,42 +2186,81 @@ ${rows}
       {/* Generate Historical Data Dialog */}
       {showDataDialog && (
         <div style={{position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300}}>
-          <div style={{background:"#1a1a2e", borderRadius:16, padding:28, width:"min(860px, 95vw)", maxHeight:"85vh", display:"flex", flexDirection:"column", border:"1px solid rgba(255,255,255,0.12)"}}>
+          <div style={{background:"#1a1a2e", borderRadius:16, padding:28, width:"min(860px, 95vw)", maxHeight:"90vh", display:"flex", flexDirection:"column", border:"1px solid rgba(255,255,255,0.12)"}}>
+
+            {/* Header */}
             <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12}}>
               <div>
                 <h2 style={{margin:0, fontSize:20, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:800, textTransform:"uppercase", letterSpacing:1}}>Updated data.json</h2>
                 <p style={{margin:"4px 0 0", fontSize:12, color:"#888"}}>
-                  Copy everything below and replace the contents of <code style={{background:"rgba(255,255,255,0.08)", padding:"1px 5px", borderRadius:3}}>public/data.json</code> in your GitHub repo.
+                  Push directly to GitHub or copy and paste manually into <code style={{background:"rgba(255,255,255,0.08)", padding:"1px 5px", borderRadius:3}}>public/data.json</code>.
                 </p>
               </div>
-              <button onClick={() => setShowDataDialog(false)}
+              <button onClick={() => { setShowDataDialog(false); setGhPushStatus(""); }}
                 style={{background:"rgba(255,255,255,0.08)", border:"none", color:"#aaa", borderRadius:8, padding:"6px 14px", cursor:"pointer", fontSize:13, marginLeft:16}}>
                 ✕ Close
               </button>
             </div>
-            <div style={{display:"flex", gap:8, marginBottom:10}}>
+
+            {/* GitHub push section */}
+            <div style={{background:"rgba(255,255,255,0.04)", borderRadius:10, padding:"12px 16px", marginBottom:12, border:"1px solid rgba(255,255,255,0.08)"}}>
+              <div style={{fontSize:11, color:"#888", textTransform:"uppercase", letterSpacing:1.5, fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700, marginBottom:8}}>Push to GitHub</div>
+              <div style={{display:"flex", gap:8, flexWrap:"wrap", alignItems:"center", marginBottom:8}}>
+                <input
+                  type="text"
+                  placeholder="GitHub repo (e.g. username/mls-tracker)"
+                  value={ghRepo}
+                  onChange={e => { setGhRepo(e.target.value); try { localStorage.setItem("mls_gh_repo", e.target.value); } catch {} }}
+                  style={{flex:2, minWidth:180, background:"rgba(255,255,255,0.08)", color:"#fff", border:"1px solid rgba(255,255,255,0.15)", borderRadius:8, padding:"7px 12px", fontSize:12, outline:"none", fontFamily:"'Barlow', sans-serif"}}
+                />
+                <input
+                  type="password"
+                  placeholder="GitHub token (ghp_...)"
+                  value={ghToken}
+                  onChange={e => { setGhToken(e.target.value); try { localStorage.setItem("mls_gh_token", e.target.value); } catch {} }}
+                  style={{flex:2, minWidth:180, background:"rgba(255,255,255,0.08)", color:"#fff", border:"1px solid rgba(255,255,255,0.15)", borderRadius:8, padding:"7px 12px", fontSize:12, outline:"none", fontFamily:"'Barlow', sans-serif"}}
+                />
+                <button
+                  onClick={() => pushToGitHub(generatedData)}
+                  disabled={ghPushStatus === "pushing"}
+                  style={{background: ghPushStatus === "success" ? "#27ae60" : ghPushStatus.startsWith("error") ? "#e74c3c" : "#C8102E", color:"#fff", border:"none", borderRadius:8, padding:"8px 20px", cursor: ghPushStatus === "pushing" ? "wait" : "pointer", fontWeight:700, fontSize:13, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1, whiteSpace:"nowrap", opacity: ghPushStatus === "pushing" ? 0.7 : 1}}>
+                  {ghPushStatus === "pushing" ? "⏳ Pushing…" : ghPushStatus === "success" ? "✓ Pushed!" : "🚀 Push to GitHub"}
+                </button>
+              </div>
+              {ghPushStatus.startsWith("error:") && (
+                <div style={{fontSize:12, color:"#e74c3c", marginTop:4}}>{ghPushStatus.slice(6)}</div>
+              )}
+              {ghPushStatus === "success" && (
+                <div style={{fontSize:12, color:"#27ae60", marginTop:4}}>✓ Committed to {ghRepo} — Vercel will redeploy automatically.</div>
+              )}
+              {!ghToken && (
+                <div style={{fontSize:11, color:"#555", marginTop:4}}>
+                  Need a token? GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → with <code style={{background:"rgba(255,255,255,0.06)", padding:"1px 4px", borderRadius:3}}>repo</code> scope.
+                </div>
+              )}
+            </div>
+
+            {/* Copy + stats row */}
+            <div style={{display:"flex", gap:8, marginBottom:10, alignItems:"center"}}>
               <button
                 onClick={() => {
                   const ta = document.getElementById("hist-data-textarea");
                   if (ta) {
-                    ta.focus();
-                    ta.select();
-                    try {
-                      document.execCommand("copy");
-                      setNotification("Copied to clipboard!");
-                    } catch(e) {
-                      setNotification("Text selected — press Ctrl+C (or Cmd+C) to copy.");
-                    }
+                    ta.focus(); ta.select();
+                    try { document.execCommand("copy"); setNotification("Copied to clipboard!"); }
+                    catch(e) { setNotification("Text selected — press Ctrl+C (or Cmd+C) to copy."); }
                     setTimeout(() => setNotification(""), 4000);
                   }
                 }}
-                style={{background:MLS_RED, color:"#fff", border:"none", borderRadius:8, padding:"8px 18px", cursor:"pointer", fontWeight:700, fontSize:13, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}>
+                style={{background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.15)", borderRadius:8, padding:"7px 16px", cursor:"pointer", fontWeight:700, fontSize:13, fontFamily:"'Barlow Condensed', sans-serif", textTransform:"uppercase", letterSpacing:1}}>
                 📋 Copy to Clipboard
               </button>
-              <span style={{fontSize:12, color:"#555", alignSelf:"center"}}>
+              <span style={{fontSize:12, color:"#555"}}>
                 {generatedData.split("\n").length.toLocaleString()} lines · {(generatedData.length / 1024).toFixed(0)}KB
               </span>
             </div>
+
+            {/* Data textarea */}
             <textarea
               id="hist-data-textarea"
               readOnly
